@@ -290,6 +290,7 @@ export function createAgentGraph(
       const onProgress = (runtime as any)?.configurable?.on_progress as
         | ((event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void)
         | undefined;
+      const runtimeThreadId = String((runtime as any)?.configurable?.thread_id ?? "");
 
       logger?.debug("Graph node: tools", {
         pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
@@ -357,6 +358,7 @@ export function createAgentGraph(
                 enabled: Boolean(cronCfg?.enabled),
                 store: cronStore,
                 defaultThreadId: cronCfg?.defaultThreadId ?? "cron",
+                currentThreadId: runtimeThreadId || undefined,
               }
             );
           }

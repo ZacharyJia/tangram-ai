@@ -168,7 +168,6 @@ async function main() {
     invoke,
     logger,
   });
-  cronRunner.start();
 
   let shutdownDone = false;
   const shutdown = () => {
@@ -185,9 +184,16 @@ async function main() {
   process.once("beforeExit", shutdown);
 
   if (config.channels.telegram?.enabled) {
-    await startTelegramGateway(config, invoke, memory, logger);
+    const telegram = await startTelegramGateway(config, invoke, memory, logger);
+    cronRunner.setOnTaskReply(async ({ threadId, taskId, reply }) => {
+      const text = [`⏰ Cron task executed: ${taskId}`, "", reply].join("\n");
+      await telegram.sendToThread({ threadId, text });
+    });
+    cronRunner.start();
     return;
   }
+
+  cronRunner.start();
 
   throw new Error("No channels enabled. Enable channels.telegram.enabled to start the gateway.");
 }

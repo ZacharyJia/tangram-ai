@@ -14,6 +14,10 @@ type InvokeFn = (params: {
   onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
 }) => Promise<string>;
 
+export type TelegramPush = {
+  sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
+};
+
 function createTypingLoop(ctx: any, chatId: string) {
   let stopped = false;
 
@@ -38,7 +42,7 @@ export async function startTelegramGateway(
   invoke: InvokeFn,
   memory: MemoryStore,
   logger?: Logger
-) {
+): Promise<TelegramPush> {
   const tg = config.channels.telegram;
   if (!tg?.enabled) {
     throw new Error("Telegram channel is not enabled in config.channels.telegram.enabled");
@@ -59,6 +63,14 @@ export async function startTelegramGateway(
     const parts = splitTelegramMessage(safeText, 3800);
     for (const part of parts) {
       await ctx.reply(part, { link_preview_options: { is_disabled: true } });
+    }
+  };
+
+  const sendToThread = async ({ threadId, text }: { threadId: string; text: string }) => {
+    const safeText = text && text.length > 0 ? text : "(empty reply)";
+    const parts = splitTelegramMessage(safeText, 3800);
+    for (const part of parts) {
+      await bot.telegram.sendMessage(threadId, part, { link_preview_options: { is_disabled: true } });
     }
   };
 
@@ -213,4 +225,6 @@ export async function startTelegramGateway(
   const stop = () => bot.stop("SIGTERM");
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+
+  return { sendToThread };
 }

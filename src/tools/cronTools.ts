@@ -261,11 +261,25 @@ function parseCronScheduleLocalInput(input: unknown):
 
 export async function executeCronTool(
   call: FunctionToolCall,
-  opts: { enabled: boolean; store: CronStore; defaultThreadId: string }
+  opts: { enabled: boolean; store: CronStore; defaultThreadId: string; currentThreadId?: string }
 ): Promise<string> {
   if (!opts.enabled) {
     return "cron tools disabled by config.agents.defaults.cron.enabled=false";
   }
+
+  const resolveThreadId = (raw: string): string => {
+    const normalized = raw.trim();
+    if (!normalized) {
+      return opts.defaultThreadId;
+    }
+
+    const currentAliases = new Set(["current", "current_thread", "this_thread", "this"]);
+    if (currentAliases.has(normalized)) {
+      return opts.currentThreadId?.trim() || opts.defaultThreadId;
+    }
+
+    return normalized;
+  };
 
   if (call.name === "cron_schedule") {
     const parsed = parseCronScheduleInput(safeJsonParse(call.argumentsJson));
@@ -276,7 +290,7 @@ export async function executeCronTool(
     try {
       const repeat = normalizeRepeat(parsed.value.repeat);
       const id = parsed.value.id.trim();
-      const threadId = parsed.value.threadId.trim() || opts.defaultThreadId;
+      const threadId = resolveThreadId(parsed.value.threadId);
       const task = await opts.store.schedule({
         id: id || undefined,
         runAt: parsed.value.runAt,
@@ -294,6 +308,7 @@ export async function executeCronTool(
         `repeat: ${formatRepeat(task.repeat)}`,
         `enabled: ${task.enabled}`,
         "note: message will be delivered to the model when task is due, not directly to the user",
+        "note: threadId supports aliases current/current_thread/this_thread",
       ].join("\n");
     } catch (err) {
       return `cron_schedule failed: ${(err as Error).message}`;
@@ -310,7 +325,7 @@ export async function executeCronTool(
       assertValidTimeZone(parsed.value.timezone);
 
       const id = parsed.value.id.trim();
-      const threadId = parsed.value.threadId.trim() || opts.defaultThreadId;
+      const threadId = resolveThreadId(parsed.value.threadId);
       const repeatMode = parsed.value.repeatMode;
 
       let runAt: string;
@@ -358,6 +373,7 @@ export async function executeCronTool(
         `repeat: ${repeatMode === "daily" ? "daily_local" : "once"}`,
         `enabled: ${task.enabled}`,
         "note: message will be delivered to the model when task is due, not directly to the user",
+        "note: threadId supports aliases current/current_thread/this_thread",
       ].join("\n");
     } catch (err) {
       return `cron_schedule_local failed: ${(err as Error).message}`;

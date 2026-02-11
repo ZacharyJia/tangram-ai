@@ -13,9 +13,14 @@ export class CronRunner {
       tickSeconds: number;
       store: CronStore;
       invoke: InvokeFn;
+      onTaskReply?: (params: { threadId: string; taskId: string; reply: string }) => Promise<void> | void;
       logger?: Logger;
     }
   ) {}
+
+  setOnTaskReply(handler?: (params: { threadId: string; taskId: string; reply: string }) => Promise<void> | void): void {
+    this.opts.onTaskReply = handler;
+  }
 
   start(): void {
     if (!this.opts.enabled) return;
@@ -77,10 +82,27 @@ export class CronRunner {
     });
 
     try {
-      await this.opts.invoke({
+      const reply = await this.opts.invoke({
         threadId: task.threadId,
         text: prompt,
       });
+
+      if (this.opts.onTaskReply) {
+        try {
+          await this.opts.onTaskReply({
+            threadId: task.threadId,
+            taskId: task.id,
+            reply,
+          });
+        } catch (err) {
+          this.opts.logger?.warn("Cron task reply callback failed", {
+            taskId: task.id,
+            threadId: task.threadId,
+            message: (err as Error)?.message,
+          });
+        }
+      }
+
       await this.opts.store.markRunSuccess(task.id);
       this.opts.logger?.debug("Cron task success", { taskId: task.id });
     } catch (err) {
@@ -93,4 +115,3 @@ export class CronRunner {
     }
   }
 }
-
