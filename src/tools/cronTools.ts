@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { FunctionToolCall, FunctionToolDef } from "../providers/types.js";
 import type { CronRepeat, CronStore } from "../scheduler/cronStore.js";
+import { assertValidTimeZone, localDateTimeToUtcIso, nextLocalTimeUtcIso } from "../scheduler/timezone.js";
 
 const CronScheduleArgs = z
   .object({
@@ -22,6 +23,19 @@ const CronScheduleArgs = z
 const CronCancelArgs = z
   .object({
     id: z.string().min(1),
+  })
+  .strict();
+
+const CronScheduleLocalArgs = z
+  .object({
+    id: z.string(),
+    timezone: z.string().min(1),
+    localTime: z.string().min(1),
+    localDate: z.string().optional(),
+    message: z.string().min(1),
+    threadId: z.string(),
+    repeatMode: z.enum(["once", "daily"]),
+    enabled: z.boolean(),
   })
   .strict();
 
@@ -57,6 +71,27 @@ export const cronToolDefs: FunctionToolDef[] = [
         enabled: { type: "boolean" },
       },
       required: ["id", "runAt", "message", "threadId", "repeat", "enabled"],
+    },
+  },
+  {
+    name: "cron_schedule_local",
+    description:
+      "Schedule task using local timezone semantics. Supports one-time local date+time or recurring daily local time.",
+    strict: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        timezone: { type: "string", description: "IANA timezone, e.g. Asia/Shanghai" },
+        localTime: { type: "string", description: "HH:mm" },
+        localDate: { type: "string", description: "YYYY-MM-DD (required for once mode)" },
+        message: { type: "string" },
+        threadId: { type: "string" },
+        repeatMode: { type: "string", enum: ["once", "daily"] },
+        enabled: { type: "boolean" },
+      },
+      required: ["id", "timezone", "localTime", "localDate", "message", "threadId", "repeatMode", "enabled"],
     },
   },
   {
@@ -106,6 +141,12 @@ function normalizeRepeat(repeat: { mode: "once" | "interval"; everySeconds: numb
   return { mode: "interval", everySeconds: sec };
 }
 
+function formatRepeat(repeat: CronRepeat): string {
+  if (repeat.mode === "once") return "once";
+  if (repeat.mode === "interval") return `interval/${repeat.everySeconds}s`;
+  return `daily_local/${repeat.localTime} ${repeat.timezone}`;
+}
+
 export async function executeCronTool(
   call: FunctionToolCall,
   opts: { enabled: boolean; store: CronStore; defaultThreadId: string }
@@ -138,11 +179,74 @@ export async function executeCronTool(
         `id: ${task.id}`,
         `threadId: ${task.threadId}`,
         `nextRunAt: ${task.nextRunAt}`,
-        `repeat: ${task.repeat.mode === "once" ? "once" : `interval/${task.repeat.everySeconds}s`}`,
+        `repeat: ${formatRepeat(task.repeat)}`,
         `enabled: ${task.enabled}`,
       ].join("\n");
     } catch (err) {
       return `cron_schedule failed: ${(err as Error).message}`;
+    }
+  }
+
+  if (call.name === "cron_schedule_local") {
+    const parsed = CronScheduleLocalArgs.safeParse(safeJsonParse(call.argumentsJson));
+    if (!parsed.success) {
+      return `Invalid arguments for cron_schedule_local: ${parsed.error.toString()}`;
+    }
+
+    try {
+      assertValidTimeZone(parsed.data.timezone);
+
+      const id = parsed.data.id.trim();
+      const threadId = parsed.data.threadId.trim() || opts.defaultThreadId;
+      const repeatMode = parsed.data.repeatMode;
+
+      let runAt: string;
+      let repeat: CronRepeat;
+
+      if (repeatMode === "once") {
+        const localDate = (parsed.data.localDate ?? "").trim();
+        if (!localDate) {
+          return "cron_schedule_local failed: localDate is required when repeatMode='once'";
+        }
+        runAt = localDateTimeToUtcIso({
+          timezone: parsed.data.timezone,
+          localDate,
+          localTime: parsed.data.localTime,
+        });
+        repeat = { mode: "once" };
+      } else {
+        runAt = nextLocalTimeUtcIso({
+          timezone: parsed.data.timezone,
+          localTime: parsed.data.localTime,
+        });
+        repeat = {
+          mode: "daily_local",
+          timezone: parsed.data.timezone,
+          localTime: parsed.data.localTime,
+        };
+      }
+
+      const task = await opts.store.schedule({
+        id: id || undefined,
+        runAt,
+        message: parsed.data.message,
+        threadId,
+        repeat,
+        enabled: parsed.data.enabled,
+      });
+
+      return [
+        "OK: cron local task scheduled",
+        `id: ${task.id}`,
+        `threadId: ${task.threadId}`,
+        `timezone: ${parsed.data.timezone}`,
+        `localTime: ${parsed.data.localTime}`,
+        `nextRunAtUtc: ${task.nextRunAt}`,
+        `repeat: ${repeatMode === "daily" ? "daily_local" : "once"}`,
+        `enabled: ${task.enabled}`,
+      ].join("\n");
+    } catch (err) {
+      return `cron_schedule_local failed: ${(err as Error).message}`;
     }
   }
 
@@ -160,9 +264,9 @@ export async function executeCronTool(
       "",
       ...tasks.map(
         (t) =>
-          `- id=${t.id} enabled=${t.enabled} next=${t.nextRunAt} repeat=${
-            t.repeat.mode === "once" ? "once" : `interval/${t.repeat.everySeconds}s`
-          } threadId=${t.threadId}`
+          `- id=${t.id} enabled=${t.enabled} next=${t.nextRunAt} repeat=${formatRepeat(
+            t.repeat
+          )} threadId=${t.threadId}`
       ),
     ].join("\n");
   }

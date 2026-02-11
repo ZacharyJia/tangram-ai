@@ -100,6 +100,7 @@ function buildInstructions(
       insertAt,
       0,
       "- cron_schedule: schedule future or recurring task callbacks",
+      "- cron_schedule_local: schedule with timezone local-time semantics",
       "- cron_list: list scheduled cron tasks",
       "- cron_cancel: cancel scheduled cron tasks"
     );
@@ -258,6 +259,7 @@ export function createAgentGraph(
           );
         } else if (
           call.name === "cron_schedule" ||
+          call.name === "cron_schedule_local" ||
           call.name === "cron_list" ||
           call.name === "cron_cancel"
         ) {

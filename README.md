@@ -149,6 +149,7 @@ Cron scheduler runs due tasks and sends their payload to the model at the schedu
 
 Model-facing cron tools:
 - `cron_schedule` set run time, repeat mode, callback text payload
+- `cron_schedule_local` set local timezone schedules (e.g. daily 09:00 Asia/Shanghai)
 - `cron_list` inspect pending tasks
 - `cron_cancel` remove a task by id
 

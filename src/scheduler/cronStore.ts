@@ -3,10 +3,12 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { expandHome } from "../utils/path.js";
+import { nextLocalTimeUtcIso } from "./timezone.js";
 
 export type CronRepeat =
   | { mode: "once" }
-  | { mode: "interval"; everySeconds: number };
+  | { mode: "interval"; everySeconds: number }
+  | { mode: "daily_local"; timezone: string; localTime: string };
 
 export type CronTask = {
   id: string;
@@ -49,6 +51,12 @@ function normalizeTask(task: CronTask): CronTask {
   if (task.repeat.mode === "interval") {
     if (!Number.isInteger(task.repeat.everySeconds) || task.repeat.everySeconds < 5) {
       throw new Error(`Invalid repeat.everySeconds for task ${task.id}`);
+    }
+  }
+
+  if (task.repeat.mode === "daily_local") {
+    if (!task.repeat.timezone || !task.repeat.localTime) {
+      throw new Error(`Invalid daily_local repeat config for task ${task.id}`);
     }
   }
 
@@ -178,14 +186,24 @@ export class CronStore {
       return;
     }
 
-    const step = t.repeat.everySeconds * 1000;
-    const base = Date.parse(t.nextRunAt);
-    const nowMs = Date.now();
-    let next = base + step;
-    while (next <= nowMs) {
-      next += step;
+    if (t.repeat.mode === "interval") {
+      const step = t.repeat.everySeconds * 1000;
+      const base = Date.parse(t.nextRunAt);
+      const nowMs = Date.now();
+      let next = base + step;
+      while (next <= nowMs) {
+        next += step;
+      }
+      t.nextRunAt = new Date(next).toISOString();
+      await this.save();
+      return;
     }
-    t.nextRunAt = new Date(next).toISOString();
+
+    t.nextRunAt = nextLocalTimeUtcIso({
+      timezone: t.repeat.timezone,
+      localTime: t.repeat.localTime,
+      fromMs: Date.now(),
+    });
 
     await this.save();
   }
@@ -202,4 +220,3 @@ export class CronStore {
     await this.save();
   }
 }
-
