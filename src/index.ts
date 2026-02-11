@@ -213,17 +213,8 @@ async function main() {
   process.once("beforeExit", shutdown);
 
   if (config.channels.telegram?.enabled) {
-    void startTelegramGateway(config, invoke, memory, logger)
-      .then((telegram) => {
-        telegramSender = telegram;
-        logger.info("Telegram sender ready for cron replies");
-      })
-      .catch((err) => {
-        logger.error("Telegram gateway failed to start", {
-          message: (err as Error)?.message,
-        });
-        process.exit(1);
-      });
+    telegramSender = await startTelegramGateway(config, invoke, memory, logger);
+    logger.info("Telegram sender ready for cron replies");
     return;
   }
 

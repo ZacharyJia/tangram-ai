@@ -238,8 +238,16 @@ export async function startTelegramGateway(
     }
   });
 
-  await bot.launch();
-  logger?.info("Telegram bot launched");
+  void bot
+    .launch()
+    .then(() => {
+      logger?.info("Telegram bot launched");
+    })
+    .catch((err) => {
+      logger?.error("Telegram bot launch failed", {
+        message: (err as Error)?.message,
+      });
+    });
 
   // Graceful shutdown.
   const stop = () => bot.stop("SIGTERM");
