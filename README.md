@@ -51,6 +51,9 @@ The agent exposes function tools to the model (via OpenAI Responses API):
 - `file_read` read local skill/content files from allowed roots
 - `file_write` write local files under allowed roots
 - `bash` execute CLI commands when `agents.defaults.shell.enabled=true`
+- `cron_schedule` schedule one-time/repeating callbacks
+- `cron_list` list scheduled callbacks
+- `cron_cancel` cancel scheduled callbacks
 
 The LangGraph workflow also runs a post-reply "memory reflection" node that can automatically summarize the latest turn into memory using a strict JSON format prompt.
 
@@ -105,6 +108,49 @@ Enable shell execution only when needed:
 When enabled, the model can call a `bash` tool with argv form commands (e.g. `['bash','-lc','ls -la']`), constrained to allowed roots.
 
 Set `shell.fullAccess=true` to disable cwd root restrictions and allow any local path.
+
+## Heartbeat (Optional)
+
+Heartbeat periodically reads `HEARTBEAT.md` and triggers a model run with that content.
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "heartbeat": {
+        "enabled": true,
+        "intervalSeconds": 300,
+        "filePath": "~/.tangram2/workspace/HEARTBEAT.md",
+        "threadId": "heartbeat"
+      }
+    }
+  }
+}
+```
+
+## Cron Scheduler
+
+Cron scheduler runs due tasks and sends their payload to the model at the scheduled time.
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "cron": {
+        "enabled": true,
+        "tickSeconds": 15,
+        "storePath": "~/.tangram2/workspace/cron-tasks.json",
+        "defaultThreadId": "cron"
+      }
+    }
+  }
+}
+```
+
+Model-facing cron tools:
+- `cron_schedule` set run time, repeat mode, callback text payload
+- `cron_list` inspect pending tasks
+- `cron_cancel` remove a task by id
 
 ## Config
 

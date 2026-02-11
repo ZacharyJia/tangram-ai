@@ -9,6 +9,9 @@ import { startTelegramGateway } from "./channels/telegram.js";
 import { MemoryStore } from "./memory/store.js";
 import { discoverSkills, renderSkillsMetadata } from "./skills/catalog.js";
 import { createLogger } from "./utils/logger.js";
+import { CronStore } from "./scheduler/cronStore.js";
+import { CronRunner } from "./scheduler/cronRunner.js";
+import { HeartbeatRunner } from "./scheduler/heartbeat.js";
 
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
@@ -88,13 +91,18 @@ async function main() {
   const memory = new MemoryStore(config.agents.defaults.workspace);
   await memory.init();
 
+  const cronCfg = config.agents.defaults.cron;
+  const cronStore = new CronStore(cronCfg.storePath);
+  await cronStore.init();
+  logger.info("Cron store ready", { path: cronStore.filePath });
+
   const skills = await discoverSkills(config);
   const skillsMetadata = renderSkillsMetadata(skills);
   // eslint-disable-next-line no-console
   console.log(`Discovered skills: ${skills.length}`);
   logger.info("Skills discovered", { count: skills.length });
 
-  const graph = createAgentGraph(config, llm, memory, skillsMetadata, logger);
+  const graph = createAgentGraph(config, llm, memory, skillsMetadata, logger, cronStore);
 
   const invoke = async ({ threadId, text }: { threadId: string; text: string }) => {
     const res = await graph.invoke(
@@ -116,6 +124,25 @@ async function main() {
     if (typeof content === "string" && content.length > 0) return content;
     return "(empty reply)";
   };
+
+  const heartbeatRunner = new HeartbeatRunner({
+    enabled: Boolean(config.agents.defaults.heartbeat?.enabled),
+    intervalSeconds: config.agents.defaults.heartbeat?.intervalSeconds ?? 300,
+    filePath: config.agents.defaults.heartbeat?.filePath ?? "~/.tangram2/workspace/HEARTBEAT.md",
+    threadId: config.agents.defaults.heartbeat?.threadId ?? "heartbeat",
+    invoke,
+    logger,
+  });
+  heartbeatRunner.start();
+
+  const cronRunner = new CronRunner({
+    enabled: Boolean(cronCfg?.enabled),
+    tickSeconds: cronCfg?.tickSeconds ?? 15,
+    store: cronStore,
+    invoke,
+    logger,
+  });
+  cronRunner.start();
 
   if (config.channels.telegram?.enabled) {
     await startTelegramGateway(config, invoke, memory, logger);

@@ -73,6 +73,36 @@ export const ConfigSchema = z
                 timeoutMs: 120000,
                 maxOutputChars: 12000,
               }),
+            heartbeat: z
+              .object({
+                enabled: z.boolean().optional().default(false),
+                intervalSeconds: z.number().int().min(10).max(86400).optional().default(300),
+                filePath: z.string().min(1).optional().default("~/.tangram2/workspace/HEARTBEAT.md"),
+                threadId: z.string().min(1).optional().default("heartbeat"),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: false,
+                intervalSeconds: 300,
+                filePath: "~/.tangram2/workspace/HEARTBEAT.md",
+                threadId: "heartbeat",
+              }),
+            cron: z
+              .object({
+                enabled: z.boolean().optional().default(true),
+                tickSeconds: z.number().int().min(5).max(3600).optional().default(15),
+                storePath: z.string().min(1).optional().default("~/.tangram2/workspace/cron-tasks.json"),
+                defaultThreadId: z.string().min(1).optional().default("cron"),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: true,
+                tickSeconds: 15,
+                storePath: "~/.tangram2/workspace/cron-tasks.json",
+                defaultThreadId: "cron",
+              }),
             model: z.string().min(1).optional(),
             temperature: z.number().min(0).max(2).optional(),
             systemPrompt: z.string().optional(),

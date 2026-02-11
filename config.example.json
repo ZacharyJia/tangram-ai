@@ -34,6 +34,18 @@
         "timeoutMs": 120000,
         "maxOutputChars": 12000
       },
+      "heartbeat": {
+        "enabled": false,
+        "intervalSeconds": 300,
+        "filePath": "~/.tangram2/workspace/HEARTBEAT.md",
+        "threadId": "heartbeat"
+      },
+      "cron": {
+        "enabled": true,
+        "tickSeconds": 15,
+        "storePath": "~/.tangram2/workspace/cron-tasks.json",
+        "defaultThreadId": "cron"
+      },
       "temperature": 0.7,
       "systemPrompt": "You are a helpful assistant. Keep replies concise."
     }

@@ -8,8 +8,10 @@ import type { MemoryStore } from "../memory/store.js";
 import { executeMemoryTool, memoryToolDefs } from "../tools/memoryTools.js";
 import { executeFileTool, fileToolDefs } from "../tools/fileTools.js";
 import { bashToolDefs, executeBashTool } from "../tools/bashTool.js";
+import { cronToolDefs, executeCronTool } from "../tools/cronTools.js";
 import { resolveSkillRoots } from "../skills/catalog.js";
 import type { Logger } from "../utils/logger.js";
+import type { CronStore } from "../scheduler/cronStore.js";
 
 type ToolCallState = {
   name: string;
@@ -49,7 +51,8 @@ function buildInstructions(
   memoryContext: string,
   skillsMetadata: string,
   hasFileTools: boolean,
-  hasBashTool: boolean
+  hasBashTool: boolean,
+  hasCronTools: boolean
 ): string | undefined {
   const baseTrimmed = (base ?? "").trim();
   const memTrimmed = (memoryContext ?? "").trim();
@@ -91,6 +94,17 @@ function buildInstructions(
     toolLines.splice(insertAt, 0, "- bash: execute CLI commands in allowed directories");
   }
 
+  if (hasCronTools) {
+    const insertAt = hasFileTools ? (hasBashTool ? 7 : 6) : hasBashTool ? 5 : 4;
+    toolLines.splice(
+      insertAt,
+      0,
+      "- cron_schedule: schedule future or recurring task callbacks",
+      "- cron_list: list scheduled cron tasks",
+      "- cron_cancel: cancel scheduled cron tasks"
+    );
+  }
+
   blocks.push(toolLines.join("\n"));
 
   return blocks.join("\n\n---\n\n");
@@ -101,7 +115,8 @@ export function createAgentGraph(
   llm: LlmClient,
   memory?: MemoryStore,
   skillsMetadata = "",
-  logger?: Logger
+  logger?: Logger,
+  cronStore?: CronStore
 ) {
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
@@ -109,6 +124,8 @@ export function createAgentGraph(
   const hasFileTools = skillRoots.length > 0;
   const shellCfg = agentDefaults.shell;
   const hasBashTool = Boolean(shellCfg?.enabled);
+  const cronCfg = agentDefaults.cron;
+  const hasCronTools = Boolean(cronCfg?.enabled && cronStore);
 
   const model = agentDefaults.model ?? provider.defaultModel;
   if (!model) {
@@ -129,12 +146,14 @@ export function createAgentGraph(
         memoryContext,
         skillsMetadata,
         hasFileTools,
-        hasBashTool
+        hasBashTool,
+        hasCronTools
       );
       const tools = [
         ...(memory ? memoryToolDefs : []),
         ...(hasFileTools ? fileToolDefs : []),
         ...(hasBashTool ? bashToolDefs : []),
+        ...(hasCronTools ? cronToolDefs : []),
       ];
 
       const res = await llm.generateWithTools({
@@ -195,7 +214,7 @@ export function createAgentGraph(
       logger?.debug("Graph node: tools", {
         pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
       });
-      if (!memory && skillRoots.length === 0 && !hasBashTool) {
+      if (!memory && skillRoots.length === 0 && !hasBashTool && !hasCronTools) {
         return { pendingToolCalls: [], toolOutputs: [] };
       }
 
@@ -237,6 +256,24 @@ export function createAgentGraph(
               maxOutputChars: shellCfg?.maxOutputChars ?? 12000,
             }
           );
+        } else if (
+          call.name === "cron_schedule" ||
+          call.name === "cron_list" ||
+          call.name === "cron_cancel"
+        ) {
+          if (!cronStore) {
+            output = "Cron tools unavailable: cron store is not initialized.";
+          } else {
+            logger?.debug("Execute cron tool", { name: call.name, callId: call.callId });
+            output = await executeCronTool(
+              { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
+              {
+                enabled: Boolean(cronCfg?.enabled),
+                store: cronStore,
+                defaultThreadId: cronCfg?.defaultThreadId ?? "cron",
+              }
+            );
+          }
         } else {
           output = `Unknown tool: ${call.name}`;
         }
