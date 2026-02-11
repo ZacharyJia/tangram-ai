@@ -23,11 +23,37 @@ async function dirExists(dir: string): Promise<boolean> {
 async function readSkillDescription(skillMdPath: string): Promise<string> {
   try {
     const raw = await fs.readFile(skillMdPath, "utf8");
-    const lines = raw.split(/\r?\n/).map((line) => line.trim());
+    const allLines = raw.split(/\r?\n/);
+
+    let contentLines = allLines;
+    if (allLines.length > 0 && allLines[0].trim() === "---") {
+      let end = -1;
+      for (let i = 1; i < allLines.length; i++) {
+        if (allLines[i].trim() === "---") {
+          end = i;
+          break;
+        }
+      }
+
+      if (end > 1) {
+        const frontMatterLines = allLines.slice(1, end);
+        for (const fmLine of frontMatterLines) {
+          const m = fmLine.match(/^\s*description\s*:\s*(.+)\s*$/i);
+          if (!m) continue;
+          const desc = m[1].trim().replace(/^['"]|['"]$/g, "");
+          if (desc) return desc.length > 220 ? `${desc.slice(0, 217)}...` : desc;
+        }
+        contentLines = allLines.slice(end + 1);
+      }
+    }
+
+    const lines = contentLines.map((line) => line.trim());
     for (const line of lines) {
       if (!line) continue;
       if (line.startsWith("#")) continue;
       if (line.startsWith("```")) continue;
+      if (line === "---") continue;
+      if (/^[a-zA-Z0-9_-]+:\s*/.test(line)) continue;
       return line.length > 220 ? `${line.slice(0, 217)}...` : line;
     }
     return "No description.";
