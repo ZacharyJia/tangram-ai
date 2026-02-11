@@ -230,6 +230,7 @@ export function createAgentGraph(
             { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
             {
               enabled: Boolean(shellCfg?.enabled),
+              fullAccess: Boolean(shellCfg?.fullAccess),
               roots: shellCfg?.roots ?? ["~/.tangram2"],
               defaultCwd: shellCfg?.defaultCwd ?? "~/.tangram2/workspace",
               timeoutMs: shellCfg?.timeoutMs ?? 120000,

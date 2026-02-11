@@ -91,6 +91,7 @@ Enable shell execution only when needed:
     "defaults": {
       "shell": {
         "enabled": true,
+        "fullAccess": false,
         "roots": ["~/.tangram2"],
         "defaultCwd": "~/.tangram2/workspace",
         "timeoutMs": 120000,
@@ -102,6 +103,8 @@ Enable shell execution only when needed:
 ```
 
 When enabled, the model can call a `bash` tool with argv form commands (e.g. `['bash','-lc','ls -la']`), constrained to allowed roots.
+
+Set `shell.fullAccess=true` to disable cwd root restrictions and allow any local path.
 
 ## Config
 

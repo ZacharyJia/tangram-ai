@@ -20,7 +20,7 @@ export const bashToolDefs: FunctionToolDef[] = [
   {
     name: "bash",
     description:
-      "Run a command with argv form. Prefer ['bash','-lc','...'] for shell syntax. Execution is restricted to configured allowed roots.",
+      "Run a command with argv form. Prefer ['bash','-lc','...'] for shell syntax. Execution restrictions depend on shell config (roots or fullAccess mode).",
     strict: true,
     parameters: {
       type: "object",
@@ -100,6 +100,7 @@ export async function executeBashTool(
   call: FunctionToolCall,
   opts: {
     enabled: boolean;
+    fullAccess: boolean;
     roots: string[];
     defaultCwd: string;
     timeoutMs: number;
@@ -120,13 +121,17 @@ export async function executeBashTool(
   const { command, cwd, timeoutMs } = parsed.data;
   const roots = resolveRoots(opts.roots);
 
-  if (!roots.length) {
+  if (!opts.fullAccess && !roots.length) {
     return "bash tool unavailable: no allowed roots configured.";
   }
 
   let runCwd: string;
   try {
-    runCwd = resolveAllowedPath(cwd ?? opts.defaultCwd, roots);
+    if (opts.fullAccess) {
+      runCwd = path.resolve(expandHome(cwd ?? opts.defaultCwd));
+    } else {
+      runCwd = resolveAllowedPath(cwd ?? opts.defaultCwd, roots);
+    }
   } catch (err) {
     return (err as Error).message;
   }

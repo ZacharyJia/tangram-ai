@@ -56,6 +56,8 @@ export const ConfigSchema = z
             shell: z
               .object({
                 enabled: z.boolean().optional().default(false),
+                // If true, skip cwd root restrictions and allow any local path.
+                fullAccess: z.boolean().optional().default(false),
                 roots: z.array(z.string().min(1)).optional().default(["~/.tangram2"]),
                 defaultCwd: z.string().min(1).optional().default("~/.tangram2/workspace"),
                 timeoutMs: z.number().int().min(500).max(300000).optional().default(120000),
@@ -65,6 +67,7 @@ export const ConfigSchema = z
               .optional()
               .default({
                 enabled: false,
+                fullAccess: false,
                 roots: ["~/.tangram2"],
                 defaultCwd: "~/.tangram2/workspace",
                 timeoutMs: 120000,

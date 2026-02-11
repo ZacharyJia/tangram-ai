@@ -26,6 +26,7 @@
       },
       "shell": {
         "enabled": false,
+        "fullAccess": false,
         "roots": [
           "~/.tangram2"
         ],
