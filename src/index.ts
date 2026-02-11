@@ -7,6 +7,7 @@ import { createLlmClient, getProvider } from "./providers/registry.js";
 import { createAgentGraph } from "./graph/agentGraph.js";
 import { startTelegramGateway } from "./channels/telegram.js";
 import { MemoryStore } from "./memory/store.js";
+import { discoverSkills, renderSkillsMetadata } from "./skills/catalog.js";
 
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
@@ -55,7 +56,12 @@ async function main() {
   const memory = new MemoryStore(config.agents.defaults.workspace);
   await memory.init();
 
-  const graph = createAgentGraph(config, llm, memory);
+  const skills = await discoverSkills(config);
+  const skillsMetadata = renderSkillsMetadata(skills);
+  // eslint-disable-next-line no-console
+  console.log(`Discovered skills: ${skills.length}`);
+
+  const graph = createAgentGraph(config, llm, memory, skillsMetadata);
 
   const invoke = async ({ threadId, text }: { threadId: string; text: string }) => {
     const res = await graph.invoke(

@@ -29,6 +29,16 @@ export const ConfigSchema = z
             provider: z.string().min(1),
             // Workspace directory for shared memory files.
             workspace: z.string().min(1).default("~/.tangram2/workspace"),
+            skills: z
+              .object({
+                enabled: z.boolean().optional().default(true),
+                // Extra skill roots. We also scan a couple of built-in defaults.
+                roots: z.array(z.string().min(1)).optional().default([]),
+                maxSkills: z.number().int().min(1).max(200).optional().default(40),
+              })
+              .strict()
+              .optional()
+              .default({ enabled: true, roots: [], maxSkills: 40 }),
             model: z.string().min(1).optional(),
             temperature: z.number().min(0).max(2).optional(),
             systemPrompt: z.string().optional(),

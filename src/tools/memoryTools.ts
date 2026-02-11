@@ -58,7 +58,7 @@ export const memoryToolDefs: FunctionToolDef[] = [
         },
         maxResults: { type: "integer", minimum: 1, maximum: 50 },
       },
-      required: ["query"],
+      required: ["query", "days", "maxResults"],
     },
   },
 ];

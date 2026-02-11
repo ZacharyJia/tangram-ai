@@ -6,6 +6,8 @@ import type { LlmClient } from "../providers/types.js";
 import { getProvider } from "../providers/registry.js";
 import type { MemoryStore } from "../memory/store.js";
 import { executeMemoryTool, memoryToolDefs } from "../tools/memoryTools.js";
+import { executeFileTool, fileToolDefs } from "../tools/fileTools.js";
+import { resolveSkillRoots } from "../skills/catalog.js";
 
 type ToolCallState = {
   name: string;
@@ -35,27 +37,51 @@ const GraphState = Annotation.Root({
 
 export type AgentGraphState = typeof GraphState.State;
 
-function buildInstructions(base: string | undefined, memoryContext: string): string | undefined {
+function buildInstructions(
+  base: string | undefined,
+  memoryContext: string,
+  skillsMetadata: string
+): string | undefined {
   const baseTrimmed = (base ?? "").trim();
   const memTrimmed = (memoryContext ?? "").trim();
+  const skillsTrimmed = (skillsMetadata ?? "").trim();
 
-  const toolHint = [
+  const blocks: string[] = [];
+
+  if (baseTrimmed) {
+    blocks.push(baseTrimmed);
+  }
+
+  if (memTrimmed) {
+    blocks.push(`# Memory\n\n${memTrimmed}`);
+  }
+
+  if (skillsTrimmed) {
+    blocks.push(skillsTrimmed);
+  }
+
+  blocks.push([
     "# Tools",
     "You may use these tools when helpful:",
     "- memory_search: search shared memory files to recall past details",
     "- memory_write: write stable facts/preferences/decisions to shared memory",
+    "- file_read: read skill files or other allowed local text files",
+    "- file_write: write/update allowed local files when needed",
     "Do NOT store secrets (API keys, tokens, passwords).",
-  ].join("\n");
+  ].join("\n"));
 
-  if (!baseTrimmed && !memTrimmed) return toolHint;
-  if (!memTrimmed) return `${baseTrimmed}\n\n---\n\n${toolHint}`;
-  if (!baseTrimmed) return `# Memory\n\n${memTrimmed}\n\n---\n\n${toolHint}`;
-  return `${baseTrimmed}\n\n---\n\n# Memory\n\n${memTrimmed}\n\n---\n\n${toolHint}`;
+  return blocks.join("\n\n---\n\n");
 }
 
-export function createAgentGraph(config: AppConfig, llm: LlmClient, memory?: MemoryStore) {
+export function createAgentGraph(
+  config: AppConfig,
+  llm: LlmClient,
+  memory?: MemoryStore,
+  skillsMetadata = ""
+) {
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
+  const skillRoots = resolveSkillRoots(config);
 
   const model = agentDefaults.model ?? provider.defaultModel;
   if (!model) {
@@ -67,14 +93,18 @@ export function createAgentGraph(config: AppConfig, llm: LlmClient, memory?: Mem
   const graph = new StateGraph(GraphState)
     .addNode("llm", async (state) => {
       const memoryContext = memory ? await memory.getMemoryContext() : "";
-      const instructions = buildInstructions(agentDefaults.systemPrompt, memoryContext);
+      const instructions = buildInstructions(agentDefaults.systemPrompt, memoryContext, skillsMetadata);
+      const tools = [
+        ...(memory ? memoryToolDefs : []),
+        ...fileToolDefs,
+      ];
 
       const res = await llm.generateWithTools({
         messages: state.messages,
         model,
         temperature: agentDefaults.temperature,
         systemPrompt: instructions,
-        tools: memory ? memoryToolDefs : undefined,
+        tools: tools.length > 0 ? tools : undefined,
         toolCallItems: state.toolCallItems,
         toolOutputs: state.toolOutputs,
       });
@@ -113,16 +143,32 @@ export function createAgentGraph(config: AppConfig, llm: LlmClient, memory?: Mem
       };
     })
     .addNode("tools", async (state) => {
-      if (!memory) {
+      if (!memory && skillRoots.length === 0) {
         return { pendingToolCalls: [], toolOutputs: [] };
       }
 
       const outputs: Array<{ type: "function_call_output"; call_id: string; output: string }> = [];
       for (const call of state.pendingToolCalls) {
-        const output = await executeMemoryTool(
-          { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
-          memory
-        );
+        let output: string;
+
+        if (call.name === "memory_search" || call.name === "memory_write") {
+          if (!memory) {
+            output = "Memory tool unavailable: memory store is not initialized.";
+          } else {
+            output = await executeMemoryTool(
+              { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
+              memory
+            );
+          }
+        } else if (call.name === "file_read" || call.name === "file_write") {
+          output = await executeFileTool(
+            { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
+            { allowedRoots: skillRoots }
+          );
+        } else {
+          output = `Unknown tool: ${call.name}`;
+        }
+
         outputs.push({ type: "function_call_output", call_id: call.callId, output });
       }
 

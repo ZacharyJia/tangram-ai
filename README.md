@@ -43,8 +43,39 @@ Telegram commands:
 The agent exposes function tools to the model (via OpenAI Responses API):
 - `memory_search` search shared memory files
 - `memory_write` append to shared memory files
+- `file_read` read local skill/content files from allowed roots
+- `file_write` write local files under allowed roots
 
 The LangGraph workflow also runs a post-reply "memory reflection" node that can automatically summarize the latest turn into memory using a strict JSON format prompt.
+
+## Skills Metadata
+
+The runtime discovers local skills and injects a compact skills list into the model instructions, so the model can decide which skill to open/use.
+
+By default it scans:
+- `~/.codex/skills`
+- `~/.codex/skills/.system`
+
+You can customize via `agents.defaults.skills`:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "skills": {
+        "enabled": true,
+        "roots": [
+          "~/.codex/skills",
+          "~/.codex/skills/.system"
+        ],
+        "maxSkills": 40
+      }
+    }
+  }
+}
+```
+
+`file_read` / `file_write` are path-restricted to these resolved skill roots.
 
 ## Config
 

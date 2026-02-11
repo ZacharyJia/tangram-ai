@@ -11,6 +11,14 @@
     "defaults": {
       "provider": "openai",
       "workspace": "~/.tangram2/workspace",
+      "skills": {
+        "enabled": true,
+        "roots": [
+          "~/.codex/skills",
+          "~/.codex/skills/.system"
+        ],
+        "maxSkills": 40
+      },
       "temperature": 0.7,
       "systemPrompt": "You are a helpful assistant. Keep replies concise."
     }
