@@ -19,6 +19,9 @@ export async function startTelegramGateway(
   if (!tg?.enabled) {
     throw new Error("Telegram channel is not enabled in config.channels.telegram.enabled");
   }
+  if (!tg.token) {
+    throw new Error("Telegram token is required when channels.telegram.enabled=true");
+  }
 
   const bot = new Telegraf(tg.token);
   logger?.info("Telegram gateway starting", {

@@ -12,6 +12,7 @@ import { createLogger } from "./utils/logger.js";
 import { CronStore } from "./scheduler/cronStore.js";
 import { CronRunner } from "./scheduler/cronRunner.js";
 import { HeartbeatRunner } from "./scheduler/heartbeat.js";
+import { runOnboard } from "./onboard/run.js";
 
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
@@ -30,6 +31,7 @@ function usage(exitCode = 0) {
     [
       "Usage:",
       "  npm run dev -- gateway [--config <path>] [--verbose|-v]",
+      "  npm run dev -- onboard",
       "",
       "Config lookup order:",
       "  1) --config <path>",
@@ -58,6 +60,10 @@ async function main() {
   const cmd = process.argv[2];
   if (!cmd || cmd === "--help" || cmd === "-h" || cmd === "help") {
     usage(0);
+  }
+  if (cmd === "onboard") {
+    await runOnboard();
+    return;
   }
   if (cmd !== "gateway") {
     // eslint-disable-next-line no-console

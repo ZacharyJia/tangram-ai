@@ -30,7 +30,16 @@ Supported providers:
 ```bash
 npm run dev -- gateway
 npm run dev -- gateway --verbose
+npm run dev -- onboard
 ```
+
+## Onboard Wizard
+
+Run `npm run dev -- onboard` for an interactive setup that:
+- asks for provider/API/Telegram settings
+- applies developer-default permissions (shell enabled but restricted)
+- initializes `~/.tangram2` directories and baseline files
+- handles existing files one by one (`overwrite` / `skip` / `backup then overwrite`)
 
 ## Memory (Shared)
 

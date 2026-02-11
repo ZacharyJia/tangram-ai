@@ -115,7 +115,7 @@ export const ConfigSchema = z
         telegram: z
           .object({
             enabled: z.boolean().optional().default(false),
-            token: z.string().min(1),
+            token: z.string().min(1).optional(),
             // Telegram numeric user IDs as strings (e.g. "12345678"). Empty => allow all.
             allowFrom: z.array(z.string().min(1)).optional().default([]),
           })
@@ -123,6 +123,16 @@ export const ConfigSchema = z
           .optional(),
       })
       .strict(),
+  })
+  .superRefine((cfg, ctx) => {
+    const tg = cfg.channels.telegram;
+    if (tg?.enabled && !tg.token) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["channels", "telegram", "token"],
+        message: "token is required when channels.telegram.enabled=true",
+      });
+    }
   })
   .strict();
 
