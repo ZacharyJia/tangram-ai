@@ -8,6 +8,7 @@ import type { MemoryStore } from "../memory/store.js";
 import { executeMemoryTool, memoryToolDefs } from "../tools/memoryTools.js";
 import { executeFileTool, fileToolDefs } from "../tools/fileTools.js";
 import { resolveSkillRoots } from "../skills/catalog.js";
+import type { Logger } from "../utils/logger.js";
 
 type ToolCallState = {
   name: string;
@@ -87,7 +88,8 @@ export function createAgentGraph(
   config: AppConfig,
   llm: LlmClient,
   memory?: MemoryStore,
-  skillsMetadata = ""
+  skillsMetadata = "",
+  logger?: Logger
 ) {
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
@@ -103,6 +105,10 @@ export function createAgentGraph(
 
   const graph = new StateGraph(GraphState)
     .addNode("llm", async (state) => {
+      logger?.debug("Graph node: llm", {
+        messageCount: state.messages.length,
+        pendingToolCalls: state.pendingToolCalls.length,
+      });
       const memoryContext = memory ? await memory.getMemoryContext() : "";
       const instructions = buildInstructions(
         agentDefaults.systemPrompt,
@@ -130,6 +136,10 @@ export function createAgentGraph(
         callId: c.callId,
         argumentsJson: c.argumentsJson,
       }));
+      logger?.debug("LLM returned", {
+        outputLength: (res.outputText || "").length,
+        toolCalls: toolCalls.map((c) => c.name),
+      });
 
       const toolCallItems = res.toolCalls.map((c) => ({
         type: "function_call" as const,
@@ -159,6 +169,9 @@ export function createAgentGraph(
       };
     })
     .addNode("tools", async (state) => {
+      logger?.debug("Graph node: tools", {
+        pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
+      });
       if (!memory && skillRoots.length === 0) {
         return { pendingToolCalls: [], toolOutputs: [] };
       }
@@ -171,12 +184,14 @@ export function createAgentGraph(
           if (!memory) {
             output = "Memory tool unavailable: memory store is not initialized.";
           } else {
+            logger?.debug("Execute memory tool", { name: call.name, callId: call.callId });
             output = await executeMemoryTool(
               { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
               memory
             );
           }
         } else if (call.name === "file_read" || call.name === "file_write") {
+          logger?.debug("Execute file tool", { name: call.name, callId: call.callId });
           output = await executeFileTool(
             { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
             { allowedRoots: skillRoots }
@@ -184,6 +199,8 @@ export function createAgentGraph(
         } else {
           output = `Unknown tool: ${call.name}`;
         }
+
+        logger?.debug("Tool output ready", { name: call.name, outputLength: output.length });
 
         outputs.push({ type: "function_call_output", call_id: call.callId, output });
       }
@@ -195,6 +212,7 @@ export function createAgentGraph(
     })
     .addNode("memory_reflect", async (state) => {
       if (!memory) return {};
+      logger?.debug("Graph node: memory_reflect", { messageCount: state.messages.length });
 
       // Reflect on the latest user<->assistant exchange and write durable memory.
       // This runs after we have produced a final assistant reply.
@@ -253,6 +271,10 @@ export function createAgentGraph(
       try {
         if (daily) await memory.appendToday(daily);
         if (longTerm) await memory.appendLongTerm(longTerm);
+        logger?.debug("Memory reflection written", {
+          wroteDaily: Boolean(daily),
+          wroteLongTerm: Boolean(longTerm),
+        });
       } catch {
         // Don't break chat if memory writes fail.
       }

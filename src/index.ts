@@ -8,11 +8,16 @@ import { createAgentGraph } from "./graph/agentGraph.js";
 import { startTelegramGateway } from "./channels/telegram.js";
 import { MemoryStore } from "./memory/store.js";
 import { discoverSkills, renderSkillsMetadata } from "./skills/catalog.js";
+import { createLogger } from "./utils/logger.js";
 
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
   if (idx === -1) return undefined;
   return process.argv[idx + 1];
+}
+
+function hasFlag(...flags: string[]): boolean {
+  return flags.some((flag) => process.argv.includes(flag));
 }
 
 function usage(exitCode = 0) {
@@ -21,7 +26,7 @@ function usage(exitCode = 0) {
   console.log(
     [
       "Usage:",
-      "  npm run dev -- gateway [--config <path>]",
+      "  npm run dev -- gateway [--config <path>] [--verbose|-v]",
       "",
       "Config lookup order:",
       "  1) --config <path>",
@@ -45,9 +50,12 @@ async function main() {
   }
 
   const configPath = getArg("--config");
+  const verbose = hasFlag("--verbose", "-v");
+  const logger = createLogger(verbose);
   const { config, configPath: loadedFrom } = await loadConfig(configPath);
   // eslint-disable-next-line no-console
   console.log(`Loaded config: ${loadedFrom}`);
+  logger.info("Gateway bootstrap", { command: cmd, verbose: logger.enabled });
 
   const providerKey = config.agents.defaults.provider;
   const provider = getProvider(config, providerKey);
@@ -60,8 +68,9 @@ async function main() {
   const skillsMetadata = renderSkillsMetadata(skills);
   // eslint-disable-next-line no-console
   console.log(`Discovered skills: ${skills.length}`);
+  logger.info("Skills discovered", { count: skills.length });
 
-  const graph = createAgentGraph(config, llm, memory, skillsMetadata);
+  const graph = createAgentGraph(config, llm, memory, skillsMetadata, logger);
 
   const invoke = async ({ threadId, text }: { threadId: string; text: string }) => {
     const res = await graph.invoke(
@@ -85,7 +94,7 @@ async function main() {
   };
 
   if (config.channels.telegram?.enabled) {
-    await startTelegramGateway(config, invoke, memory);
+    await startTelegramGateway(config, invoke, memory, logger);
     return;
   }
 

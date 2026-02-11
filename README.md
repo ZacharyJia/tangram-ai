@@ -25,6 +25,7 @@ Edit `~/.tangram2/config.json` and set:
 
 ```bash
 npm run dev -- gateway
+npm run dev -- gateway --verbose
 ```
 
 ## Memory (Shared)

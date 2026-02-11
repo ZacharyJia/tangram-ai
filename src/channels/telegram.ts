@@ -5,16 +5,25 @@ import type { AppConfig } from "../config/schema.js";
 import { splitTelegramMessage } from "../utils/telegram.js";
 import { withKeyLock } from "../session/locks.js";
 import type { MemoryStore } from "../memory/store.js";
+import type { Logger } from "../utils/logger.js";
 
 type InvokeFn = (params: { threadId: string; text: string }) => Promise<string>;
 
-export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, memory: MemoryStore) {
+export async function startTelegramGateway(
+  config: AppConfig,
+  invoke: InvokeFn,
+  memory: MemoryStore,
+  logger?: Logger
+) {
   const tg = config.channels.telegram;
   if (!tg?.enabled) {
     throw new Error("Telegram channel is not enabled in config.channels.telegram.enabled");
   }
 
   const bot = new Telegraf(tg.token);
+  logger?.info("Telegram gateway starting", {
+    allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
+  });
 
   const replyText = async (ctx: any, text: string) => {
     const safeText = text && text.length > 0 ? text : "(empty reply)";
@@ -30,6 +39,10 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
   });
 
   bot.command("memory", async (ctx) => {
+    logger?.debug("Command /memory", {
+      chatId: String(ctx.chat?.id ?? ""),
+      userId: String(ctx.from?.id ?? ""),
+    });
     const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
     if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
       if (!userId || !tg.allowFrom.includes(userId)) {
@@ -52,6 +65,10 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
   });
 
   bot.command("remember", async (ctx) => {
+    logger?.debug("Command /remember", {
+      chatId: String(ctx.chat?.id ?? ""),
+      userId: String(ctx.from?.id ?? ""),
+    });
     const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
     if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
       if (!userId || !tg.allowFrom.includes(userId)) {
@@ -72,6 +89,10 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
   });
 
   bot.command("remember_long", async (ctx) => {
+    logger?.debug("Command /remember_long", {
+      chatId: String(ctx.chat?.id ?? ""),
+      userId: String(ctx.from?.id ?? ""),
+    });
     const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
     if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
       if (!userId || !tg.allowFrom.includes(userId)) {
@@ -97,6 +118,12 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
     const text = (ctx.message as any)?.text as string | undefined;
     if (!text) return;
 
+    logger?.debug("Incoming text", {
+      chatId,
+      userId,
+      length: text.length,
+    });
+
     if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
       if (!userId || !tg.allowFrom.includes(userId)) {
         await replyText(ctx, "Not allowed.");
@@ -107,6 +134,7 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
     try {
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
       const reply = await withKeyLock(chatId, async () => invoke({ threadId: chatId, text }));
+      logger?.debug("Outgoing reply", { chatId, length: reply.length });
       await replyText(ctx, reply);
     } catch (err) {
       // Avoid echoing huge payloads back to Telegram (which can recurse into the same error).
@@ -114,6 +142,7 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
       const errorId = randomUUID().slice(0, 8);
       // eslint-disable-next-line no-console
       console.error(`[telegram][${errorId}]`, err);
+      logger?.error("Invoke failed", { errorId, chatId, userId, message: (err as Error)?.message });
 
       // User-facing error should be short and never include provider payloads.
       const safe = `Provider error (${errorId}). Check server logs.`;
@@ -127,6 +156,7 @@ export async function startTelegramGateway(config: AppConfig, invoke: InvokeFn, 
   });
 
   await bot.launch();
+  logger?.info("Telegram bot launched");
 
   // Graceful shutdown.
   const stop = () => bot.stop("SIGTERM");
