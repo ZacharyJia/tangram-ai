@@ -17,6 +17,11 @@ type ToolCallState = {
   argumentsJson: string;
 };
 
+function clipForLog(text: string, maxChars = 4000): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}... [truncated ${text.length - maxChars} chars]`;
+}
+
 const GraphState = Annotation.Root({
   ...MessagesAnnotation.spec,
   lastReply: Annotation<string>({
@@ -151,6 +156,13 @@ export function createAgentGraph(
         outputLength: (res.outputText || "").length,
         toolCalls: toolCalls.map((c) => c.name),
       });
+      for (const toolCall of toolCalls) {
+        logger?.debug("LLM tool call detail", {
+          name: toolCall.name,
+          callId: toolCall.callId,
+          argumentsJson: clipForLog(toolCall.argumentsJson),
+        });
+      }
 
       const toolCallItems = res.toolCalls.map((c) => ({
         type: "function_call" as const,
@@ -190,6 +202,11 @@ export function createAgentGraph(
       const outputs: Array<{ type: "function_call_output"; call_id: string; output: string }> = [];
       for (const call of state.pendingToolCalls) {
         let output: string;
+        logger?.debug("Tool call dispatch", {
+          name: call.name,
+          callId: call.callId,
+          argumentsJson: clipForLog(call.argumentsJson),
+        });
 
         if (call.name === "memory_search" || call.name === "memory_write") {
           if (!memory) {
@@ -223,7 +240,12 @@ export function createAgentGraph(
           output = `Unknown tool: ${call.name}`;
         }
 
-        logger?.debug("Tool output ready", { name: call.name, outputLength: output.length });
+        logger?.debug("Tool output ready", {
+          name: call.name,
+          callId: call.callId,
+          outputLength: output.length,
+          outputPreview: clipForLog(output),
+        });
 
         outputs.push({ type: "function_call_output", call_id: call.callId, output });
       }
