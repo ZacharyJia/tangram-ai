@@ -188,7 +188,20 @@ async function main() {
     const telegram = await startTelegramGateway(config, invoke, memory, logger);
     cronRunner.setOnTaskReply(async ({ threadId, taskId, reply }) => {
       const text = [`⏰ Cron task executed: ${taskId}`, "", reply].join("\n");
-      await telegram.sendToThread({ threadId, text });
+      try {
+        await telegram.sendToThread({ threadId, text });
+        logger.info("Cron task reply delivered", {
+          taskId,
+          threadId,
+          replyLength: reply.length,
+        });
+      } catch (err) {
+        logger.error("Cron task reply delivery failed", {
+          taskId,
+          threadId,
+          message: (err as Error)?.message,
+        });
+      }
     });
     return;
   }

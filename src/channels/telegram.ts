@@ -37,6 +37,23 @@ function createTypingLoop(ctx: any, chatId: string) {
   };
 }
 
+function resolveChatId(rawThreadId: string, fallbackThreadId?: string): number | string {
+  const aliases = new Set(["current", "current_thread", "this_thread", "this"]);
+  let effective = rawThreadId.trim();
+  if (aliases.has(effective) && fallbackThreadId) {
+    effective = fallbackThreadId;
+  }
+
+  if (/^-?\d+$/.test(effective)) {
+    const asNum = Number(effective);
+    if (Number.isSafeInteger(asNum)) {
+      return asNum;
+    }
+  }
+
+  return effective;
+}
+
 export async function startTelegramGateway(
   config: AppConfig,
   invoke: InvokeFn,
@@ -52,6 +69,7 @@ export async function startTelegramGateway(
   }
 
   const bot = new Telegraf(tg.token);
+  let lastSeenChatId: string | undefined;
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
     progressUpdates: tg.progressUpdates !== false,
@@ -68,9 +86,10 @@ export async function startTelegramGateway(
 
   const sendToThread = async ({ threadId, text }: { threadId: string; text: string }) => {
     const safeText = text && text.length > 0 ? text : "(empty reply)";
+    const chatId = resolveChatId(threadId, lastSeenChatId);
     const parts = splitTelegramMessage(safeText, 3800);
     for (const part of parts) {
-      await bot.telegram.sendMessage(threadId, part, { link_preview_options: { is_disabled: true } });
+      await bot.telegram.sendMessage(chatId, part, { link_preview_options: { is_disabled: true } });
     }
   };
 
@@ -154,6 +173,7 @@ export async function startTelegramGateway(
 
   bot.on("text", async (ctx) => {
     const chatId = String(ctx.chat.id);
+    lastSeenChatId = chatId;
     const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
     const text = (ctx.message as any)?.text as string | undefined;
     if (!text) return;
