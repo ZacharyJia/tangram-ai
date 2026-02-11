@@ -38,6 +38,19 @@ function usage(exitCode = 0) {
   process.exit(exitCode);
 }
 
+function supportsColor(): boolean {
+  return Boolean(process.stderr.isTTY) && !process.env.NO_COLOR;
+}
+
+function formatSecurityWarning(message: string): string {
+  if (!supportsColor()) return message;
+  const red = "\x1b[31m";
+  const yellow = "\x1b[33m";
+  const bold = "\x1b[1m";
+  const reset = "\x1b[0m";
+  return `${bold}${red}⚠ SECURITY WARNING${reset} ${yellow}${message}${reset}`;
+}
+
 async function main() {
   const cmd = process.argv[2];
   if (!cmd || cmd === "--help" || cmd === "-h" || cmd === "help") {
@@ -60,8 +73,9 @@ async function main() {
     // Always print this warning, even when --verbose is disabled.
     // eslint-disable-next-line no-console
     console.warn(
-      "[SECURITY WARNING] shell.fullAccess=true: bash tool can execute commands in any local path. " +
-        "Use only in trusted environments."
+      formatSecurityWarning(
+        "shell.fullAccess=true: bash tool can execute commands in any local path. Use only in trusted environments."
+      )
     );
   }
 
