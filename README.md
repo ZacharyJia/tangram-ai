@@ -53,8 +53,7 @@ The LangGraph workflow also runs a post-reply "memory reflection" node that can 
 The runtime discovers local skills and injects a compact skills list into the model instructions, so the model can decide which skill to open/use.
 
 By default it scans:
-- `~/.codex/skills`
-- `~/.codex/skills/.system`
+- `./skills` (project root)
 
 You can customize via `agents.defaults.skills`:
 
@@ -65,8 +64,7 @@ You can customize via `agents.defaults.skills`:
       "skills": {
         "enabled": true,
         "roots": [
-          "~/.codex/skills",
-          "~/.codex/skills/.system"
+          "./skills"
         ],
         "maxSkills": 40
       }

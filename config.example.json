@@ -14,8 +14,7 @@
       "skills": {
         "enabled": true,
         "roots": [
-          "~/.codex/skills",
-          "~/.codex/skills/.system"
+          "./skills"
         ],
         "maxSkills": 40
       },

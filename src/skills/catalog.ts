@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import type { AppConfig } from "../config/schema.js";
@@ -49,14 +48,7 @@ function dedupePaths(paths: string[]): string[] {
 }
 
 function getDefaultSkillRoots(): string[] {
-  const codexHome = process.env.CODEX_HOME
-    ? expandHome(process.env.CODEX_HOME)
-    : path.join(os.homedir(), ".codex");
-
-  return [
-    path.join(codexHome, "skills"),
-    path.join(codexHome, "skills", ".system"),
-  ];
+  return [path.resolve(process.cwd(), "skills")];
 }
 
 export function resolveSkillRoots(config: AppConfig): string[] {
