@@ -49,7 +49,7 @@ export const cronToolDefs: FunctionToolDef[] = [
   {
     name: "cron_schedule",
     description:
-      "Schedule or update a cron task. Provide runAt (ISO datetime), message payload, optional threadId, and repeat settings.",
+      "Schedule or update a cron task. message is callback text that will be sent to the model at trigger time (not a direct user message).",
     strict: true,
     parameters: {
       type: "object",
@@ -57,7 +57,11 @@ export const cronToolDefs: FunctionToolDef[] = [
       properties: {
         id: { type: "string" },
         runAt: { type: "string", description: "ISO datetime, e.g. 2026-02-12T03:00:00Z" },
-        message: { type: "string" },
+        message: {
+          type: "string",
+          description:
+            "Callback payload for future model execution when task is due; this is NOT sent directly to end users.",
+        },
         threadId: { type: "string" },
         repeat: {
           type: "object",
@@ -76,7 +80,7 @@ export const cronToolDefs: FunctionToolDef[] = [
   {
     name: "cron_schedule_local",
     description:
-      "Schedule task using local timezone semantics. Supports one-time local date+time or recurring daily local time.",
+      "Schedule task using local timezone semantics. message is callback text for the model at trigger time, not a direct user message.",
     strict: true,
     parameters: {
       type: "object",
@@ -86,7 +90,11 @@ export const cronToolDefs: FunctionToolDef[] = [
         timezone: { type: "string", description: "IANA timezone, e.g. Asia/Shanghai" },
         localTime: { type: "string", description: "HH:mm" },
         localDate: { type: "string", description: "YYYY-MM-DD (required for once mode)" },
-        message: { type: "string" },
+        message: {
+          type: "string",
+          description:
+            "Callback payload for future model execution when task is due; this is NOT sent directly to end users.",
+        },
         threadId: { type: "string" },
         repeatMode: { type: "string", enum: ["once", "daily"] },
         enabled: { type: "boolean" },
@@ -181,6 +189,7 @@ export async function executeCronTool(
         `nextRunAt: ${task.nextRunAt}`,
         `repeat: ${formatRepeat(task.repeat)}`,
         `enabled: ${task.enabled}`,
+        "note: message will be delivered to the model when task is due, not directly to the user",
       ].join("\n");
     } catch (err) {
       return `cron_schedule failed: ${(err as Error).message}`;
@@ -244,6 +253,7 @@ export async function executeCronTool(
         `nextRunAtUtc: ${task.nextRunAt}`,
         `repeat: ${repeatMode === "daily" ? "daily_local" : "once"}`,
         `enabled: ${task.enabled}`,
+        "note: message will be delivered to the model when task is due, not directly to the user",
       ].join("\n");
     } catch (err) {
       return `cron_schedule_local failed: ${(err as Error).message}`;
