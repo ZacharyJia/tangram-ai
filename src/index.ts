@@ -55,6 +55,16 @@ async function main() {
   const { config, configPath: loadedFrom } = await loadConfig(configPath);
   // eslint-disable-next-line no-console
   console.log(`Loaded config: ${loadedFrom}`);
+
+  if (config.agents.defaults.shell?.enabled && config.agents.defaults.shell?.fullAccess) {
+    // Always print this warning, even when --verbose is disabled.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[SECURITY WARNING] shell.fullAccess=true: bash tool can execute commands in any local path. " +
+        "Use only in trusted environments."
+    );
+  }
+
   logger.info("Gateway bootstrap", { command: cmd, verbose: logger.enabled });
 
   const providerKey = config.agents.defaults.provider;
