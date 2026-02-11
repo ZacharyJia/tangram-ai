@@ -89,12 +89,23 @@ You can customize via `agents.defaults.skills`:
         "roots": [
           "~/.tangram2/skills"
         ],
-        "maxSkills": 40
+        "maxSkills": 40,
+        "hotReload": {
+          "enabled": true,
+          "debounceMs": 800,
+          "logDiff": true
+        }
       }
     }
   }
 }
 ```
+
+Hot reload behavior:
+- skill directory/file changes are detected with filesystem watchers
+- reload is debounced (`hotReload.debounceMs`) to avoid noisy rapid rescans
+- updates apply globally to the next LLM execution without restarting gateway
+- when `hotReload.logDiff=true`, gateway logs added/removed/changed skills
 
 `file_read` / `file_write` / `file_edit` are path-restricted to these resolved skill roots.
 

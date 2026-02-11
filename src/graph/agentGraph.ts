@@ -134,7 +134,7 @@ export function createAgentGraph(
   config: AppConfig,
   llm: LlmClient,
   memory?: MemoryStore,
-  skillsMetadata = "",
+  getSkillsMetadata?: () => string,
   logger?: Logger,
   cronStore?: CronStore
 ) {
@@ -165,6 +165,7 @@ export function createAgentGraph(
         pendingToolCalls: state.pendingToolCalls.length,
       });
       const memoryContext = memory ? await memory.getMemoryContext() : "";
+      const skillsMetadata = getSkillsMetadata ? getSkillsMetadata() : "";
       const instructions = buildInstructions(
         agentDefaults.systemPrompt,
         memoryContext,

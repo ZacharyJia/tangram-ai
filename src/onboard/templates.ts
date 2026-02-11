@@ -22,6 +22,11 @@ export function buildConfigJson(answers: OnboardAnswers): string {
           enabled: true,
           roots: ["~/.tangram2/skills"],
           maxSkills: 40,
+          hotReload: {
+            enabled: true,
+            debounceMs: 800,
+            logDiff: true,
+          },
         },
         shell: {
           enabled: answers.shellEnabled,
@@ -98,4 +103,3 @@ export function buildSkillsReadmeTemplate(): string {
     "The runtime discovers these folders and injects skill metadata into prompts.",
   ].join("\n");
 }
-

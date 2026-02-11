@@ -7,7 +7,7 @@ import { createLlmClient, getProvider } from "./providers/registry.js";
 import { createAgentGraph } from "./graph/agentGraph.js";
 import { startTelegramGateway } from "./channels/telegram.js";
 import { MemoryStore } from "./memory/store.js";
-import { discoverSkills, renderSkillsMetadata } from "./skills/catalog.js";
+import { SkillsRuntime } from "./skills/runtime.js";
 import { createLogger } from "./utils/logger.js";
 import { CronStore } from "./scheduler/cronStore.js";
 import { CronRunner } from "./scheduler/cronRunner.js";
@@ -102,13 +102,25 @@ async function main() {
   await cronStore.init();
   logger.info("Cron store ready", { path: cronStore.filePath });
 
-  const skills = await discoverSkills(config);
-  const skillsMetadata = renderSkillsMetadata(skills);
+  const skillsRuntime = new SkillsRuntime(config, logger);
+  await skillsRuntime.start();
+  const initialSkillsSnapshot = skillsRuntime.getSnapshot();
   // eslint-disable-next-line no-console
-  console.log(`Discovered skills: ${skills.length}`);
-  logger.info("Skills discovered", { count: skills.length });
+  console.log(`Discovered skills: ${initialSkillsSnapshot.skills.length}`);
+  logger.info("Skills snapshot ready", {
+    count: initialSkillsSnapshot.skills.length,
+    version: initialSkillsSnapshot.version,
+    updatedAt: initialSkillsSnapshot.updatedAt,
+  });
 
-  const graph = createAgentGraph(config, llm, memory, skillsMetadata, logger, cronStore);
+  const graph = createAgentGraph(
+    config,
+    llm,
+    memory,
+    () => skillsRuntime.getSnapshot().metadata,
+    logger,
+    cronStore
+  );
 
   const invoke = async ({
     threadId,
@@ -157,6 +169,20 @@ async function main() {
     logger,
   });
   cronRunner.start();
+
+  let shutdownDone = false;
+  const shutdown = () => {
+    if (shutdownDone) return;
+    shutdownDone = true;
+    heartbeatRunner.stop();
+    cronRunner.stop();
+    skillsRuntime.stop();
+    logger.info("Gateway shutdown complete");
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  process.once("beforeExit", shutdown);
 
   if (config.channels.telegram?.enabled) {
     await startTelegramGateway(config, invoke, memory, logger);

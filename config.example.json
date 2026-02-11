@@ -22,7 +22,12 @@
         "roots": [
           "~/.tangram2/skills"
         ],
-        "maxSkills": 40
+        "maxSkills": 40,
+        "hotReload": {
+          "enabled": true,
+          "debounceMs": 800,
+          "logDiff": true
+        }
       },
       "shell": {
         "enabled": false,

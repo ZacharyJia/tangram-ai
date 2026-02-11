@@ -49,10 +49,24 @@ export const ConfigSchema = z
                 // Extra skill roots. We also scan a couple of built-in defaults.
                 roots: z.array(z.string().min(1)).optional().default([]),
                 maxSkills: z.number().int().min(1).max(200).optional().default(40),
+                hotReload: z
+                  .object({
+                    enabled: z.boolean().optional().default(true),
+                    debounceMs: z.number().int().min(100).max(10000).optional().default(800),
+                    logDiff: z.boolean().optional().default(true),
+                  })
+                  .strict()
+                  .optional()
+                  .default({ enabled: true, debounceMs: 800, logDiff: true }),
               })
               .strict()
               .optional()
-              .default({ enabled: true, roots: [], maxSkills: 40 }),
+              .default({
+                enabled: true,
+                roots: [],
+                maxSkills: 40,
+                hotReload: { enabled: true, debounceMs: 800, logDiff: true },
+              }),
             shell: z
               .object({
                 enabled: z.boolean().optional().default(false),
