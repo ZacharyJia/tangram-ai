@@ -13,8 +13,14 @@ const MemoryWriteArgs = z
 const MemorySearchArgs = z
   .object({
     query: z.string().min(1),
-    days: z.number().int().min(0).max(3650).optional().default(30),
-    maxResults: z.number().int().min(1).max(50).optional().default(10),
+    days: z
+      .preprocess((v) => (typeof v === "string" ? Number(v) : v), z.number().int().min(0).max(3650))
+      .optional()
+      .default(30),
+    maxResults: z
+      .preprocess((v) => (typeof v === "string" ? Number(v) : v), z.number().int().min(1).max(50))
+      .optional()
+      .default(10),
   })
   .strict();
 
