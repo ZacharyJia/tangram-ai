@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "defaultModel": "gpt-4.1-mini"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "provider": "openai",
+      "workspace": "~/.tangram2/workspace",
+      "temperature": 0.7,
+      "systemPrompt": "You are a helpful assistant. Keep replies concise."
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "123456:ABCDEF...",
+      "allowFrom": []
+    }
+  }
+}

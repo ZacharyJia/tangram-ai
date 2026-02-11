@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Local config (contains secrets)
+config.json
+
+# OS
+.DS_Store
+
+# Logs
+*.log
