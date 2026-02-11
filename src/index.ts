@@ -110,13 +110,21 @@ async function main() {
 
   const graph = createAgentGraph(config, llm, memory, skillsMetadata, logger, cronStore);
 
-  const invoke = async ({ threadId, text }: { threadId: string; text: string }) => {
+  const invoke = async ({
+    threadId,
+    text,
+    onProgress,
+  }: {
+    threadId: string;
+    text: string;
+    onProgress?: (message: string) => Promise<void> | void;
+  }) => {
     const res = await graph.invoke(
       {
         messages: [new HumanMessage(text)],
       },
       {
-        configurable: { thread_id: threadId },
+        configurable: { thread_id: threadId, on_progress: onProgress },
       }
     );
 

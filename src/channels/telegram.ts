@@ -1,5 +1,6 @@
 import { Telegraf } from "telegraf";
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import type { AppConfig } from "../config/schema.js";
 import { splitTelegramMessage } from "../utils/telegram.js";
@@ -7,7 +8,30 @@ import { withKeyLock } from "../session/locks.js";
 import type { MemoryStore } from "../memory/store.js";
 import type { Logger } from "../utils/logger.js";
 
-type InvokeFn = (params: { threadId: string; text: string }) => Promise<string>;
+type InvokeFn = (params: {
+  threadId: string;
+  text: string;
+  onProgress?: (message: string) => Promise<void> | void;
+}) => Promise<string>;
+
+function createTypingLoop(ctx: any, chatId: string) {
+  let stopped = false;
+
+  const run = async () => {
+    while (!stopped) {
+      try {
+        await ctx.telegram.sendChatAction(chatId, "typing");
+      } catch {
+      }
+      await sleep(3500);
+    }
+  };
+
+  void run();
+  return () => {
+    stopped = true;
+  };
+}
 
 export async function startTelegramGateway(
   config: AppConfig,
@@ -135,10 +159,25 @@ export async function startTelegramGateway(
     }
 
     try {
+      const stopTyping = createTypingLoop(ctx, chatId);
+      const progressThrottleMs = 1200;
+      let lastProgressAt = 0;
+
+      const onProgress = async (message: string) => {
+        const now = Date.now();
+        if (now - lastProgressAt < progressThrottleMs) return;
+        lastProgressAt = now;
+        await replyText(ctx, `⏳ ${message}`);
+      };
+
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
-      const reply = await withKeyLock(chatId, async () => invoke({ threadId: chatId, text }));
-      logger?.debug("Outgoing reply", { chatId, length: reply.length });
-      await replyText(ctx, reply);
+      try {
+        const reply = await withKeyLock(chatId, async () => invoke({ threadId: chatId, text, onProgress }));
+        logger?.debug("Outgoing reply", { chatId, length: reply.length });
+        await replyText(ctx, reply);
+      } finally {
+        stopTyping();
+      }
     } catch (err) {
       // Avoid echoing huge payloads back to Telegram (which can recurse into the same error).
       // Log full error locally.

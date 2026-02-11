@@ -24,6 +24,22 @@ function clipForLog(text: string, maxChars = 4000): string {
   return `${text.slice(0, maxChars)}... [truncated ${text.length - maxChars} chars]`;
 }
 
+async function emitProgress(
+  onProgress: ((message: string) => Promise<void> | void) | undefined,
+  message: string,
+  logger?: Logger
+): Promise<void> {
+  if (!onProgress) return;
+  const text = message.trim();
+  if (!text) return;
+
+  try {
+    await onProgress(text);
+  } catch (err) {
+    logger?.warn("Progress callback failed", { message: (err as Error)?.message });
+  }
+}
+
 const GraphState = Annotation.Root({
   ...MessagesAnnotation.spec,
   lastReply: Annotation<string>({
@@ -137,7 +153,11 @@ export function createAgentGraph(
   }
 
   const graph = new StateGraph(GraphState)
-    .addNode("llm", async (state) => {
+    .addNode("llm", async (state, runtime) => {
+      const onProgress = (runtime as any)?.configurable?.on_progress as
+        | ((message: string) => Promise<void> | void)
+        | undefined;
+
       logger?.debug("Graph node: llm", {
         messageCount: state.messages.length,
         pendingToolCalls: state.pendingToolCalls.length,
@@ -185,6 +205,15 @@ export function createAgentGraph(
         });
       }
 
+      if (toolCalls.length > 0) {
+        const explanation = (res.outputText || "").trim();
+        if (explanation) {
+          await emitProgress(onProgress, explanation, logger);
+        } else {
+          await emitProgress(onProgress, "正在调用工具处理你的请求…", logger);
+        }
+      }
+
       const toolCallItems = res.toolCalls.map((c) => ({
         type: "function_call" as const,
         call_id: c.callId,
@@ -212,7 +241,11 @@ export function createAgentGraph(
         toolOutputs: [],
       };
     })
-    .addNode("tools", async (state) => {
+    .addNode("tools", async (state, runtime) => {
+      const onProgress = (runtime as any)?.configurable?.on_progress as
+        | ((message: string) => Promise<void> | void)
+        | undefined;
+
       logger?.debug("Graph node: tools", {
         pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
       });
@@ -228,6 +261,7 @@ export function createAgentGraph(
           callId: call.callId,
           argumentsJson: clipForLog(call.argumentsJson),
         });
+        await emitProgress(onProgress, `工具执行中：${call.name}`, logger);
 
         if (call.name === "memory_search" || call.name === "memory_write") {
           if (!memory) {
@@ -287,6 +321,8 @@ export function createAgentGraph(
           outputLength: output.length,
           outputPreview: clipForLog(output),
         });
+        const firstLine = output.split(/\r?\n/)[0]?.trim() || "(no output)";
+        await emitProgress(onProgress, `工具完成：${call.name} · ${clipForLog(firstLine, 160)}`, logger);
 
         outputs.push({ type: "function_call_output", call_id: call.callId, output });
       }

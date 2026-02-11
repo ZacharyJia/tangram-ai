@@ -52,6 +52,10 @@ Telegram commands:
 - `/remember <text>` append to today's daily memory
 - `/remember_long <text>` append to long-term memory
 
+Telegram UX behaviors:
+- bot sends `typing` action while processing
+- during tool-calling loops, progress hints may be sent as temporary `⏳ ...` updates
+
 ## Memory Tools (LLM)
 
 The agent exposes function tools to the model (via OpenAI Responses API):
