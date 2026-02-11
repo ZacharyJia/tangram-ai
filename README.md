@@ -21,6 +21,10 @@ Edit `~/.tangram2/config.json` and set:
 - `providers.<yourProviderKey>.apiKey`
 - optionally `providers.<yourProviderKey>.baseUrl`
 
+Supported providers:
+- `openai` (Responses API)
+- `anthropic` (Messages API, supports custom `baseUrl`)
+
 3) Run
 
 ```bash
@@ -88,6 +92,12 @@ This project supports **multiple provider instances**. Example:
       "apiKey": "sk-...",
       "baseUrl": "https://api.openai.com/v1",
       "defaultModel": "gpt-4.1-mini"
+    },
+    "anthropic": {
+      "type": "anthropic",
+      "apiKey": "sk-ant-...",
+      "baseUrl": "https://api.anthropic.com",
+      "defaultModel": "claude-3-5-sonnet-latest"
     },
     "local": {
       "type": "openai",

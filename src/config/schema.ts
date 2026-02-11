@@ -16,7 +16,21 @@ const OpenAIProviderSchema = z
   })
   .strict();
 
-export const ProviderSchema = z.discriminatedUnion("type", [OpenAIProviderSchema]);
+const AnthropicProviderSchema = z
+  .object({
+    type: z.literal("anthropic"),
+    apiKey: z.string().min(1),
+    // For Anthropic-compatible gateways.
+    baseUrl: z.string().min(1).optional(),
+    defaultModel: z.string().min(1).optional(),
+    anthropicVersion: z.string().min(1).optional().default("2023-06-01"),
+  })
+  .strict();
+
+export const ProviderSchema = z.discriminatedUnion("type", [
+  OpenAIProviderSchema,
+  AnthropicProviderSchema,
+]);
 export type ProviderConfig = z.infer<typeof ProviderSchema>;
 
 export const ConfigSchema = z

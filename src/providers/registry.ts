@@ -1,6 +1,7 @@
 import type { AppConfig, ProviderConfig } from "../config/schema.js";
 import type { LlmClient } from "./types.js";
 import { createOpenAIResponsesClient } from "./openaiResponses.js";
+import { createAnthropicMessagesClient } from "./anthropicMessages.js";
 
 export function getProvider(config: AppConfig, key: string): ProviderConfig {
   const provider = config.providers[key];
@@ -15,6 +16,8 @@ export function createLlmClient(provider: ProviderConfig): LlmClient {
     case "openai":
       // MVP default: OpenAI Responses API.
       return createOpenAIResponsesClient(provider);
+    case "anthropic":
+      return createAnthropicMessagesClient(provider);
     default:
       throw new Error(`Unsupported provider type: ${(provider as any).type}`);
   }
