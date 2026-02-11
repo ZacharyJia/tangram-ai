@@ -117,7 +117,7 @@ async function main() {
   }: {
     threadId: string;
     text: string;
-    onProgress?: (message: string) => Promise<void> | void;
+    onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
   }) => {
     const res = await graph.invoke(
       {

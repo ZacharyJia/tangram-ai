@@ -25,16 +25,18 @@ function clipForLog(text: string, maxChars = 4000): string {
 }
 
 async function emitProgress(
-  onProgress: ((message: string) => Promise<void> | void) | undefined,
-  message: string,
+  onProgress:
+    | ((event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void)
+    | undefined,
+  event: { kind: "assistant_explanation" | "tool_progress"; message: string },
   logger?: Logger
 ): Promise<void> {
   if (!onProgress) return;
-  const text = message.trim();
+  const text = event.message.trim();
   if (!text) return;
 
   try {
-    await onProgress(text);
+    await onProgress({ ...event, message: text });
   } catch (err) {
     logger?.warn("Progress callback failed", { message: (err as Error)?.message });
   }
@@ -155,7 +157,7 @@ export function createAgentGraph(
   const graph = new StateGraph(GraphState)
     .addNode("llm", async (state, runtime) => {
       const onProgress = (runtime as any)?.configurable?.on_progress as
-        | ((message: string) => Promise<void> | void)
+        | ((event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void)
         | undefined;
 
       logger?.debug("Graph node: llm", {
@@ -208,9 +210,17 @@ export function createAgentGraph(
       if (toolCalls.length > 0) {
         const explanation = (res.outputText || "").trim();
         if (explanation) {
-          await emitProgress(onProgress, explanation, logger);
+          await emitProgress(
+            onProgress,
+            { kind: "assistant_explanation", message: explanation },
+            logger
+          );
         } else {
-          await emitProgress(onProgress, "正在调用工具处理你的请求…", logger);
+          await emitProgress(
+            onProgress,
+            { kind: "tool_progress", message: "正在调用工具处理你的请求…" },
+            logger
+          );
         }
       }
 
@@ -243,7 +253,7 @@ export function createAgentGraph(
     })
     .addNode("tools", async (state, runtime) => {
       const onProgress = (runtime as any)?.configurable?.on_progress as
-        | ((message: string) => Promise<void> | void)
+        | ((event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void)
         | undefined;
 
       logger?.debug("Graph node: tools", {
@@ -261,7 +271,11 @@ export function createAgentGraph(
           callId: call.callId,
           argumentsJson: clipForLog(call.argumentsJson),
         });
-        await emitProgress(onProgress, `工具执行中：${call.name}`, logger);
+        await emitProgress(
+          onProgress,
+          { kind: "tool_progress", message: `工具执行中：${call.name}` },
+          logger
+        );
 
         if (call.name === "memory_search" || call.name === "memory_write") {
           if (!memory) {
@@ -322,7 +336,11 @@ export function createAgentGraph(
           outputPreview: clipForLog(output),
         });
         const firstLine = output.split(/\r?\n/)[0]?.trim() || "(no output)";
-        await emitProgress(onProgress, `工具完成：${call.name} · ${clipForLog(firstLine, 160)}`, logger);
+        await emitProgress(
+          onProgress,
+          { kind: "tool_progress", message: `工具完成：${call.name} · ${clipForLog(firstLine, 160)}` },
+          logger
+        );
 
         outputs.push({ type: "function_call_output", call_id: call.callId, output });
       }

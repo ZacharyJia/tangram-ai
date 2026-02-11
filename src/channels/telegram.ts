@@ -11,7 +11,7 @@ import type { Logger } from "../utils/logger.js";
 type InvokeFn = (params: {
   threadId: string;
   text: string;
-  onProgress?: (message: string) => Promise<void> | void;
+  onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
 }) => Promise<string>;
 
 function createTypingLoop(ctx: any, chatId: string) {
@@ -165,12 +165,18 @@ export async function startTelegramGateway(
       let lastProgressAt = 0;
       const progressEnabled = tg.progressUpdates !== false;
 
-      const onProgress = async (message: string) => {
-        if (!progressEnabled) return;
+      const onProgress = async (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => {
+        if (event.kind === "tool_progress" && !progressEnabled) return;
         const now = Date.now();
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
-        await replyText(ctx, `⏳ ${message}`);
+
+        if (event.kind === "assistant_explanation") {
+          await replyText(ctx, `💬 ${event.message}`);
+          return;
+        }
+
+        await replyText(ctx, `⏳ ${event.message}`);
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
