@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import type { AppConfig } from "../config/schema.js";
@@ -48,7 +49,7 @@ function dedupePaths(paths: string[]): string[] {
 }
 
 function getDefaultSkillRoots(): string[] {
-  return [path.resolve(process.cwd(), "skills")];
+  return [path.join(os.homedir(), ".tangram2", "skills")];
 }
 
 export function resolveSkillRoots(config: AppConfig): string[] {

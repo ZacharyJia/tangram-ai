@@ -19,13 +19,15 @@ async function fileExists(p: string): Promise<boolean> {
 }
 
 export async function resolveConfigPath(explicitPath?: string): Promise<string> {
+  const homeConfig = path.join(os.homedir(), ".tangram2", "config.json");
   const candidates: Array<string | undefined> = [
     explicitPath,
     process.env.TANGRAM2_CONFIG,
     // Back-compat from earlier MVP naming.
     process.env.NANOGRAPHBOT_CONFIG,
+    homeConfig,
+    // Legacy fallback for older local-dev setups.
     path.resolve(process.cwd(), "config.json"),
-    path.join(os.homedir(), ".tangram2", "config.json"),
   ];
 
   for (const c of candidates) {
@@ -33,7 +35,7 @@ export async function resolveConfigPath(explicitPath?: string): Promise<string> 
     if (await fileExists(c)) return c;
   }
 
-  return candidates.find(Boolean) ?? path.resolve(process.cwd(), "config.json");
+  return candidates.find(Boolean) ?? homeConfig;
 }
 
 export async function loadConfig(explicitPath?: string): Promise<LoadedConfig> {
@@ -48,7 +50,7 @@ export async function loadConfig(explicitPath?: string): Promise<LoadedConfig> {
         [
           `Config file not found: ${configPath}`,
           "Create one from config.example.json:",
-          "  cp config.example.json config.json",
+          "  mkdir -p ~/.tangram2 && cp config.example.json ~/.tangram2/config.json",
           "Or set TANGRAM2_CONFIG to an absolute path.",
         ].join("\n")
       );

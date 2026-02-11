@@ -14,7 +14,7 @@
       "skills": {
         "enabled": true,
         "roots": [
-          "./skills"
+          "~/.tangram2/skills"
         ],
         "maxSkills": 40
       },

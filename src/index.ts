@@ -26,8 +26,8 @@ function usage(exitCode = 0) {
       "Config lookup order:",
       "  1) --config <path>",
       "  2) $TANGRAM2_CONFIG",
-      "  3) ./config.json",
-      "  4) ~/.tangram2/config.json",
+      "  3) ~/.tangram2/config.json",
+      "  4) ./config.json (legacy fallback)",
     ].join("\n")
   );
   process.exit(exitCode);

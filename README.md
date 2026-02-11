@@ -13,10 +13,10 @@ npm i
 2) Create config
 
 ```bash
-cp config.example.json config.json
+mkdir -p ~/.tangram2 && cp config.example.json ~/.tangram2/config.json
 ```
 
-Edit `config.json` and set:
+Edit `~/.tangram2/config.json` and set:
 - `channels.telegram.token`
 - `providers.<yourProviderKey>.apiKey`
 - optionally `providers.<yourProviderKey>.baseUrl`
@@ -53,7 +53,7 @@ The LangGraph workflow also runs a post-reply "memory reflection" node that can 
 The runtime discovers local skills and injects a compact skills list into the model instructions, so the model can decide which skill to open/use.
 
 By default it scans:
-- `./skills` (project root)
+- `~/.tangram2/skills`
 
 You can customize via `agents.defaults.skills`:
 
@@ -64,7 +64,7 @@ You can customize via `agents.defaults.skills`:
       "skills": {
         "enabled": true,
         "roots": [
-          "./skills"
+          "~/.tangram2/skills"
         ],
         "maxSkills": 40
       }
@@ -115,5 +115,5 @@ This project supports **multiple provider instances**. Example:
 Config lookup order:
 - `--config <path>`
 - `TANGRAM2_CONFIG`
-- `./config.json`
 - `~/.tangram2/config.json`
+- `./config.json` (legacy fallback)
