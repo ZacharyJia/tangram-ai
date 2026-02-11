@@ -40,7 +40,8 @@ export type AgentGraphState = typeof GraphState.State;
 function buildInstructions(
   base: string | undefined,
   memoryContext: string,
-  skillsMetadata: string
+  skillsMetadata: string,
+  hasFileTools: boolean
 ): string | undefined {
   const baseTrimmed = (base ?? "").trim();
   const memTrimmed = (memoryContext ?? "").trim();
@@ -60,15 +61,24 @@ function buildInstructions(
     blocks.push(skillsTrimmed);
   }
 
-  blocks.push([
+  const toolLines = [
     "# Tools",
     "You may use these tools when helpful:",
     "- memory_search: search shared memory files to recall past details",
     "- memory_write: write stable facts/preferences/decisions to shared memory",
-    "- file_read: read skill files or other allowed local text files",
-    "- file_write: write/update allowed local files when needed",
     "Do NOT store secrets (API keys, tokens, passwords).",
-  ].join("\n"));
+  ];
+
+  if (hasFileTools) {
+    toolLines.splice(
+      4,
+      0,
+      "- file_read: read skill files or other allowed local text files",
+      "- file_write: write/update allowed local files when needed"
+    );
+  }
+
+  blocks.push(toolLines.join("\n"));
 
   return blocks.join("\n\n---\n\n");
 }
@@ -82,6 +92,7 @@ export function createAgentGraph(
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
   const skillRoots = resolveSkillRoots(config);
+  const hasFileTools = skillRoots.length > 0;
 
   const model = agentDefaults.model ?? provider.defaultModel;
   if (!model) {
@@ -93,10 +104,15 @@ export function createAgentGraph(
   const graph = new StateGraph(GraphState)
     .addNode("llm", async (state) => {
       const memoryContext = memory ? await memory.getMemoryContext() : "";
-      const instructions = buildInstructions(agentDefaults.systemPrompt, memoryContext, skillsMetadata);
+      const instructions = buildInstructions(
+        agentDefaults.systemPrompt,
+        memoryContext,
+        skillsMetadata,
+        hasFileTools
+      );
       const tools = [
         ...(memory ? memoryToolDefs : []),
-        ...fileToolDefs,
+        ...(hasFileTools ? fileToolDefs : []),
       ];
 
       const res = await llm.generateWithTools({
