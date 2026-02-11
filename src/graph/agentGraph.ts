@@ -7,6 +7,7 @@ import { getProvider } from "../providers/registry.js";
 import type { MemoryStore } from "../memory/store.js";
 import { executeMemoryTool, memoryToolDefs } from "../tools/memoryTools.js";
 import { executeFileTool, fileToolDefs } from "../tools/fileTools.js";
+import { bashToolDefs, executeBashTool } from "../tools/bashTool.js";
 import { resolveSkillRoots } from "../skills/catalog.js";
 import type { Logger } from "../utils/logger.js";
 
@@ -42,7 +43,8 @@ function buildInstructions(
   base: string | undefined,
   memoryContext: string,
   skillsMetadata: string,
-  hasFileTools: boolean
+  hasFileTools: boolean,
+  hasBashTool: boolean
 ): string | undefined {
   const baseTrimmed = (base ?? "").trim();
   const memTrimmed = (memoryContext ?? "").trim();
@@ -79,6 +81,11 @@ function buildInstructions(
     );
   }
 
+  if (hasBashTool) {
+    const insertAt = hasFileTools ? 6 : 4;
+    toolLines.splice(insertAt, 0, "- bash: execute CLI commands in allowed directories");
+  }
+
   blocks.push(toolLines.join("\n"));
 
   return blocks.join("\n\n---\n\n");
@@ -95,6 +102,8 @@ export function createAgentGraph(
   const provider = getProvider(config, agentDefaults.provider);
   const skillRoots = resolveSkillRoots(config);
   const hasFileTools = skillRoots.length > 0;
+  const shellCfg = agentDefaults.shell;
+  const hasBashTool = Boolean(shellCfg?.enabled);
 
   const model = agentDefaults.model ?? provider.defaultModel;
   if (!model) {
@@ -114,11 +123,13 @@ export function createAgentGraph(
         agentDefaults.systemPrompt,
         memoryContext,
         skillsMetadata,
-        hasFileTools
+        hasFileTools,
+        hasBashTool
       );
       const tools = [
         ...(memory ? memoryToolDefs : []),
         ...(hasFileTools ? fileToolDefs : []),
+        ...(hasBashTool ? bashToolDefs : []),
       ];
 
       const res = await llm.generateWithTools({
@@ -172,7 +183,7 @@ export function createAgentGraph(
       logger?.debug("Graph node: tools", {
         pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
       });
-      if (!memory && skillRoots.length === 0) {
+      if (!memory && skillRoots.length === 0 && !hasBashTool) {
         return { pendingToolCalls: [], toolOutputs: [] };
       }
 
@@ -195,6 +206,18 @@ export function createAgentGraph(
           output = await executeFileTool(
             { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
             { allowedRoots: skillRoots }
+          );
+        } else if (call.name === "bash") {
+          logger?.debug("Execute bash tool", { name: call.name, callId: call.callId });
+          output = await executeBashTool(
+            { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
+            {
+              enabled: Boolean(shellCfg?.enabled),
+              roots: shellCfg?.roots ?? ["~/.tangram2"],
+              defaultCwd: shellCfg?.defaultCwd ?? "~/.tangram2/workspace",
+              timeoutMs: shellCfg?.timeoutMs ?? 120000,
+              maxOutputChars: shellCfg?.maxOutputChars ?? 12000,
+            }
           );
         } else {
           output = `Unknown tool: ${call.name}`;

@@ -50,6 +50,7 @@ The agent exposes function tools to the model (via OpenAI Responses API):
 - `memory_write` append to shared memory files
 - `file_read` read local skill/content files from allowed roots
 - `file_write` write local files under allowed roots
+- `bash` execute CLI commands when `agents.defaults.shell.enabled=true`
 
 The LangGraph workflow also runs a post-reply "memory reflection" node that can automatically summarize the latest turn into memory using a strict JSON format prompt.
 
@@ -79,6 +80,28 @@ You can customize via `agents.defaults.skills`:
 ```
 
 `file_read` / `file_write` are path-restricted to these resolved skill roots.
+
+## Shell Tool (Optional)
+
+Enable shell execution only when needed:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "shell": {
+        "enabled": true,
+        "roots": ["~/.tangram2"],
+        "defaultCwd": "~/.tangram2/workspace",
+        "timeoutMs": 120000,
+        "maxOutputChars": 12000
+      }
+    }
+  }
+}
+```
+
+When enabled, the model can call a `bash` tool with argv form commands (e.g. `['bash','-lc','ls -la']`), constrained to allowed roots.
 
 ## Config
 

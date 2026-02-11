@@ -53,6 +53,23 @@ export const ConfigSchema = z
               .strict()
               .optional()
               .default({ enabled: true, roots: [], maxSkills: 40 }),
+            shell: z
+              .object({
+                enabled: z.boolean().optional().default(false),
+                roots: z.array(z.string().min(1)).optional().default(["~/.tangram2"]),
+                defaultCwd: z.string().min(1).optional().default("~/.tangram2/workspace"),
+                timeoutMs: z.number().int().min(500).max(300000).optional().default(120000),
+                maxOutputChars: z.number().int().min(200).max(200000).optional().default(12000),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: false,
+                roots: ["~/.tangram2"],
+                defaultCwd: "~/.tangram2/workspace",
+                timeoutMs: 120000,
+                maxOutputChars: 12000,
+              }),
             model: z.string().min(1).optional(),
             temperature: z.number().min(0).max(2).optional(),
             systemPrompt: z.string().optional(),

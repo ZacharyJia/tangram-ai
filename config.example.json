@@ -24,6 +24,15 @@
         ],
         "maxSkills": 40
       },
+      "shell": {
+        "enabled": false,
+        "roots": [
+          "~/.tangram2"
+        ],
+        "defaultCwd": "~/.tangram2/workspace",
+        "timeoutMs": 120000,
+        "maxOutputChars": 12000
+      },
       "temperature": 0.7,
       "systemPrompt": "You are a helpful assistant. Keep replies concise."
     }
