@@ -116,6 +116,7 @@ export const ConfigSchema = z
           .object({
             enabled: z.boolean().optional().default(false),
             token: z.string().min(1).optional(),
+            progressUpdates: z.boolean().optional().default(true),
             // Telegram numeric user IDs as strings (e.g. "12345678"). Empty => allow all.
             allowFrom: z.array(z.string().min(1)).optional().default([]),
           })

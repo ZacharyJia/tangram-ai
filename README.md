@@ -54,7 +54,7 @@ Telegram commands:
 
 Telegram UX behaviors:
 - bot sends `typing` action while processing
-- during tool-calling loops, progress hints may be sent as temporary `⏳ ...` updates
+- during tool-calling loops, progress hints may be sent as temporary `⏳ ...` updates (controlled by `channels.telegram.progressUpdates`, default `true`)
 
 ## Memory Tools (LLM)
 

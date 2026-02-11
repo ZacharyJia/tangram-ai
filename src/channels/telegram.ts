@@ -50,6 +50,7 @@ export async function startTelegramGateway(
   const bot = new Telegraf(tg.token);
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
+    progressUpdates: tg.progressUpdates !== false,
   });
 
   const replyText = async (ctx: any, text: string) => {
@@ -162,8 +163,10 @@ export async function startTelegramGateway(
       const stopTyping = createTypingLoop(ctx, chatId);
       const progressThrottleMs = 1200;
       let lastProgressAt = 0;
+      const progressEnabled = tg.progressUpdates !== false;
 
       const onProgress = async (message: string) => {
+        if (!progressEnabled) return;
         const now = Date.now();
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
