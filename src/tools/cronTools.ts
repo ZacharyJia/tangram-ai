@@ -8,6 +8,22 @@ const CronScheduleArgs = z
   .object({
     id: z.string(),
     runAt: z.string().min(1),
+    callbackPrompt: z.string().min(1),
+    threadId: z.string(),
+    repeat: z
+      .object({
+        mode: z.enum(["once", "interval"]),
+        everySeconds: z.number().int().min(0).max(365 * 24 * 3600),
+      })
+      .strict(),
+    enabled: z.boolean(),
+  })
+  .strict();
+
+const CronScheduleArgsLegacy = z
+  .object({
+    id: z.string(),
+    runAt: z.string().min(1),
     message: z.string().min(1),
     threadId: z.string(),
     repeat: z
@@ -32,6 +48,19 @@ const CronScheduleLocalArgs = z
     timezone: z.string().min(1),
     localTime: z.string().min(1),
     localDate: z.string().optional(),
+    callbackPrompt: z.string().min(1),
+    threadId: z.string(),
+    repeatMode: z.enum(["once", "daily"]),
+    enabled: z.boolean(),
+  })
+  .strict();
+
+const CronScheduleLocalArgsLegacy = z
+  .object({
+    id: z.string(),
+    timezone: z.string().min(1),
+    localTime: z.string().min(1),
+    localDate: z.string().optional(),
     message: z.string().min(1),
     threadId: z.string(),
     repeatMode: z.enum(["once", "daily"]),
@@ -49,7 +78,7 @@ export const cronToolDefs: FunctionToolDef[] = [
   {
     name: "cron_schedule",
     description:
-      "Schedule or update a cron task. message is callback text that will be sent to the model at trigger time (not a direct user message).",
+      "Schedule or update a cron task. callbackPrompt is callback text sent to the model at trigger time (not a direct user message).",
     strict: true,
     parameters: {
       type: "object",
@@ -57,10 +86,10 @@ export const cronToolDefs: FunctionToolDef[] = [
       properties: {
         id: { type: "string" },
         runAt: { type: "string", description: "ISO datetime, e.g. 2026-02-12T03:00:00Z" },
-        message: {
+        callbackPrompt: {
           type: "string",
           description:
-            "Callback payload for future model execution when task is due; this is NOT sent directly to end users.",
+            "Prompt payload for future model execution when task is due; this is NOT sent directly to end users.",
         },
         threadId: { type: "string" },
         repeat: {
@@ -74,13 +103,13 @@ export const cronToolDefs: FunctionToolDef[] = [
         },
         enabled: { type: "boolean" },
       },
-      required: ["id", "runAt", "message", "threadId", "repeat", "enabled"],
+      required: ["id", "runAt", "callbackPrompt", "threadId", "repeat", "enabled"],
     },
   },
   {
     name: "cron_schedule_local",
     description:
-      "Schedule task using local timezone semantics. message is callback text for the model at trigger time, not a direct user message.",
+      "Schedule task using local timezone semantics. callbackPrompt is callback text for model execution at trigger time, not a direct user message.",
     strict: true,
     parameters: {
       type: "object",
@@ -90,16 +119,25 @@ export const cronToolDefs: FunctionToolDef[] = [
         timezone: { type: "string", description: "IANA timezone, e.g. Asia/Shanghai" },
         localTime: { type: "string", description: "HH:mm" },
         localDate: { type: "string", description: "YYYY-MM-DD (required for once mode)" },
-        message: {
+        callbackPrompt: {
           type: "string",
           description:
-            "Callback payload for future model execution when task is due; this is NOT sent directly to end users.",
+            "Prompt payload for future model execution when task is due; this is NOT sent directly to end users.",
         },
         threadId: { type: "string" },
         repeatMode: { type: "string", enum: ["once", "daily"] },
         enabled: { type: "boolean" },
       },
-      required: ["id", "timezone", "localTime", "localDate", "message", "threadId", "repeatMode", "enabled"],
+      required: [
+        "id",
+        "timezone",
+        "localTime",
+        "localDate",
+        "callbackPrompt",
+        "threadId",
+        "repeatMode",
+        "enabled",
+      ],
     },
   },
   {
@@ -155,6 +193,72 @@ function formatRepeat(repeat: CronRepeat): string {
   return `daily_local/${repeat.localTime} ${repeat.timezone}`;
 }
 
+function parseCronScheduleInput(input: unknown):
+  | {
+      ok: true;
+      value: {
+        id: string;
+        runAt: string;
+        callbackPrompt: string;
+        threadId: string;
+        repeat: { mode: "once" | "interval"; everySeconds: number };
+        enabled: boolean;
+      };
+    }
+  | { ok: false; error: string } {
+  const parsed = CronScheduleArgs.safeParse(input);
+  if (parsed.success) {
+    return { ok: true, value: parsed.data };
+  }
+
+  const legacy = CronScheduleArgsLegacy.safeParse(input);
+  if (legacy.success) {
+    return {
+      ok: true,
+      value: {
+        ...legacy.data,
+        callbackPrompt: legacy.data.message,
+      },
+    };
+  }
+
+  return { ok: false, error: parsed.error.toString() };
+}
+
+function parseCronScheduleLocalInput(input: unknown):
+  | {
+      ok: true;
+      value: {
+        id: string;
+        timezone: string;
+        localTime: string;
+        localDate?: string;
+        callbackPrompt: string;
+        threadId: string;
+        repeatMode: "once" | "daily";
+        enabled: boolean;
+      };
+    }
+  | { ok: false; error: string } {
+  const parsed = CronScheduleLocalArgs.safeParse(input);
+  if (parsed.success) {
+    return { ok: true, value: parsed.data };
+  }
+
+  const legacy = CronScheduleLocalArgsLegacy.safeParse(input);
+  if (legacy.success) {
+    return {
+      ok: true,
+      value: {
+        ...legacy.data,
+        callbackPrompt: legacy.data.message,
+      },
+    };
+  }
+
+  return { ok: false, error: parsed.error.toString() };
+}
+
 export async function executeCronTool(
   call: FunctionToolCall,
   opts: { enabled: boolean; store: CronStore; defaultThreadId: string }
@@ -164,22 +268,22 @@ export async function executeCronTool(
   }
 
   if (call.name === "cron_schedule") {
-    const parsed = CronScheduleArgs.safeParse(safeJsonParse(call.argumentsJson));
-    if (!parsed.success) {
-      return `Invalid arguments for cron_schedule: ${parsed.error.toString()}`;
+    const parsed = parseCronScheduleInput(safeJsonParse(call.argumentsJson));
+    if (!parsed.ok) {
+      return `Invalid arguments for cron_schedule: ${parsed.error}`;
     }
 
     try {
-      const repeat = normalizeRepeat(parsed.data.repeat);
-      const id = parsed.data.id.trim();
-      const threadId = parsed.data.threadId.trim() || opts.defaultThreadId;
+      const repeat = normalizeRepeat(parsed.value.repeat);
+      const id = parsed.value.id.trim();
+      const threadId = parsed.value.threadId.trim() || opts.defaultThreadId;
       const task = await opts.store.schedule({
         id: id || undefined,
-        runAt: parsed.data.runAt,
-        message: parsed.data.message,
+        runAt: parsed.value.runAt,
+        message: parsed.value.callbackPrompt,
         threadId,
         repeat,
-        enabled: parsed.data.enabled,
+        enabled: parsed.value.enabled,
       });
 
       return [
@@ -197,59 +301,59 @@ export async function executeCronTool(
   }
 
   if (call.name === "cron_schedule_local") {
-    const parsed = CronScheduleLocalArgs.safeParse(safeJsonParse(call.argumentsJson));
-    if (!parsed.success) {
-      return `Invalid arguments for cron_schedule_local: ${parsed.error.toString()}`;
+    const parsed = parseCronScheduleLocalInput(safeJsonParse(call.argumentsJson));
+    if (!parsed.ok) {
+      return `Invalid arguments for cron_schedule_local: ${parsed.error}`;
     }
 
     try {
-      assertValidTimeZone(parsed.data.timezone);
+      assertValidTimeZone(parsed.value.timezone);
 
-      const id = parsed.data.id.trim();
-      const threadId = parsed.data.threadId.trim() || opts.defaultThreadId;
-      const repeatMode = parsed.data.repeatMode;
+      const id = parsed.value.id.trim();
+      const threadId = parsed.value.threadId.trim() || opts.defaultThreadId;
+      const repeatMode = parsed.value.repeatMode;
 
       let runAt: string;
       let repeat: CronRepeat;
 
       if (repeatMode === "once") {
-        const localDate = (parsed.data.localDate ?? "").trim();
+        const localDate = (parsed.value.localDate ?? "").trim();
         if (!localDate) {
           return "cron_schedule_local failed: localDate is required when repeatMode='once'";
         }
         runAt = localDateTimeToUtcIso({
-          timezone: parsed.data.timezone,
+          timezone: parsed.value.timezone,
           localDate,
-          localTime: parsed.data.localTime,
+          localTime: parsed.value.localTime,
         });
         repeat = { mode: "once" };
       } else {
         runAt = nextLocalTimeUtcIso({
-          timezone: parsed.data.timezone,
-          localTime: parsed.data.localTime,
+          timezone: parsed.value.timezone,
+          localTime: parsed.value.localTime,
         });
         repeat = {
           mode: "daily_local",
-          timezone: parsed.data.timezone,
-          localTime: parsed.data.localTime,
+          timezone: parsed.value.timezone,
+          localTime: parsed.value.localTime,
         };
       }
 
       const task = await opts.store.schedule({
         id: id || undefined,
         runAt,
-        message: parsed.data.message,
+        message: parsed.value.callbackPrompt,
         threadId,
         repeat,
-        enabled: parsed.data.enabled,
+        enabled: parsed.value.enabled,
       });
 
       return [
         "OK: cron local task scheduled",
         `id: ${task.id}`,
         `threadId: ${task.threadId}`,
-        `timezone: ${parsed.data.timezone}`,
-        `localTime: ${parsed.data.localTime}`,
+        `timezone: ${parsed.value.timezone}`,
+        `localTime: ${parsed.value.localTime}`,
         `nextRunAtUtc: ${task.nextRunAt}`,
         `repeat: ${repeatMode === "daily" ? "daily_local" : "once"}`,
         `enabled: ${task.enabled}`,
