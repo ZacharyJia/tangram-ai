@@ -85,7 +85,8 @@ function buildInstructions(
       4,
       0,
       "- file_read: read skill files or other allowed local text files",
-      "- file_write: write/update allowed local files when needed"
+      "- file_write: write/update allowed local files when needed",
+      "- file_edit: edit files by targeted replace operations"
     );
   }
 
@@ -238,7 +239,7 @@ export function createAgentGraph(
               memory
             );
           }
-        } else if (call.name === "file_read" || call.name === "file_write") {
+        } else if (call.name === "file_read" || call.name === "file_write" || call.name === "file_edit") {
           logger?.debug("Execute file tool", { name: call.name, callId: call.callId });
           output = await executeFileTool(
             { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },

@@ -50,6 +50,7 @@ The agent exposes function tools to the model (via OpenAI Responses API):
 - `memory_write` append to shared memory files
 - `file_read` read local skill/content files from allowed roots
 - `file_write` write local files under allowed roots
+- `file_edit` edit files by targeted text replacement
 - `bash` execute CLI commands when `agents.defaults.shell.enabled=true`
 - `cron_schedule` schedule one-time/repeating callbacks
 - `cron_list` list scheduled callbacks
@@ -82,7 +83,7 @@ You can customize via `agents.defaults.skills`:
 }
 ```
 
-`file_read` / `file_write` are path-restricted to these resolved skill roots.
+`file_read` / `file_write` / `file_edit` are path-restricted to these resolved skill roots.
 
 ## Shell Tool (Optional)
 

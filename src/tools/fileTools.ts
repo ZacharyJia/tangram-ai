@@ -20,6 +20,24 @@ const FileWriteArgs = z
   })
   .strict();
 
+const FileEditArgs = z
+  .object({
+    path: z.string().min(1),
+    replacements: z
+      .array(
+        z
+          .object({
+            from: z.string().min(1),
+            to: z.string(),
+            replaceAll: z.boolean().optional().default(false),
+          })
+          .strict()
+      )
+      .min(1),
+    createIfMissing: z.boolean().optional().default(false),
+  })
+  .strict();
+
 export const fileToolDefs: FunctionToolDef[] = [
   {
     name: "file_read",
@@ -53,7 +71,49 @@ export const fileToolDefs: FunctionToolDef[] = [
       required: ["path", "content", "mode"],
     },
   },
+  {
+    name: "file_edit",
+    description:
+      "Edit an existing UTF-8 text file by replacing text snippets. Supports first-match or replace-all mode for each replacement.",
+    strict: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        path: { type: "string", description: "Absolute or allowed-root-relative file path." },
+        replacements: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+              replaceAll: { type: "boolean", default: false },
+            },
+            required: ["from", "to", "replaceAll"],
+          },
+        },
+        createIfMissing: { type: "boolean", default: false },
+      },
+      required: ["path", "replacements", "createIfMissing"],
+    },
+  },
 ];
+
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let start = 0;
+  while (start <= haystack.length) {
+    const idx = haystack.indexOf(needle, start);
+    if (idx === -1) break;
+    count += 1;
+    start = idx + needle.length;
+  }
+  return count;
+}
 
 function safeJsonParse(json: string): unknown {
   try {
@@ -159,6 +219,62 @@ export async function executeFileTool(
     }
   }
 
+  if (call.name === "file_edit") {
+    const parsed = FileEditArgs.safeParse(safeJsonParse(call.argumentsJson));
+    if (!parsed.success) {
+      return `Invalid arguments for file_edit: ${parsed.error.toString()}`;
+    }
+
+    const { path: rawPath, replacements, createIfMissing } = parsed.data;
+    let fp: string;
+    try {
+      fp = resolveAllowedPath(rawPath, opts.allowedRoots);
+    } catch (err) {
+      return (err as Error).message;
+    }
+
+    let content = "";
+    try {
+      content = await fs.readFile(fp, "utf8");
+    } catch (err) {
+      if ((err as any)?.code === "ENOENT" && createIfMissing) {
+        content = "";
+      } else {
+        return `file_edit failed: ${(err as Error).message}`;
+      }
+    }
+
+    const applied: string[] = [];
+    let next = content;
+
+    for (let i = 0; i < replacements.length; i++) {
+      const r = replacements[i];
+      const found = countOccurrences(next, r.from);
+      if (found === 0) {
+        return `file_edit failed: replacement #${i + 1} not found: ${JSON.stringify(r.from)}`;
+      }
+
+      if (r.replaceAll) {
+        next = next.split(r.from).join(r.to);
+        applied.push(`#${i + 1}: replaced all (${found})`);
+      } else {
+        next = next.replace(r.from, r.to);
+        applied.push(`#${i + 1}: replaced first match`);
+      }
+    }
+
+    try {
+      await fs.mkdir(path.dirname(fp), { recursive: true });
+      await fs.writeFile(fp, next, "utf8");
+      return [
+        `OK: edited file ${fp}`,
+        `Applied: ${applied.length} replacement(s)`,
+        ...applied.map((x) => `- ${x}`),
+      ].join("\n");
+    } catch (err) {
+      return `file_edit failed: ${(err as Error).message}`;
+    }
+  }
+
   return `Unknown tool: ${call.name}`;
 }
-
