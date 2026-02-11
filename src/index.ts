@@ -168,6 +168,34 @@ async function main() {
     invoke,
     logger,
   });
+
+  let telegramSender: { sendToThread: (params: { threadId: string; text: string }) => Promise<void> } | undefined;
+  cronRunner.setOnTaskReply(async ({ threadId, taskId, reply }) => {
+    if (!telegramSender) {
+      logger.warn("Cron task reply skipped: telegram sender not ready", {
+        taskId,
+        threadId,
+      });
+      return;
+    }
+
+    const text = [`⏰ Cron task executed: ${taskId}`, "", reply].join("\n");
+    try {
+      await telegramSender.sendToThread({ threadId, text });
+      logger.info("Cron task reply delivered", {
+        taskId,
+        threadId,
+        replyLength: reply.length,
+      });
+    } catch (err) {
+      logger.error("Cron task reply delivery failed", {
+        taskId,
+        threadId,
+        message: (err as Error)?.message,
+      });
+    }
+  });
+
   cronRunner.start();
 
   let shutdownDone = false;
@@ -185,24 +213,17 @@ async function main() {
   process.once("beforeExit", shutdown);
 
   if (config.channels.telegram?.enabled) {
-    const telegram = await startTelegramGateway(config, invoke, memory, logger);
-    cronRunner.setOnTaskReply(async ({ threadId, taskId, reply }) => {
-      const text = [`⏰ Cron task executed: ${taskId}`, "", reply].join("\n");
-      try {
-        await telegram.sendToThread({ threadId, text });
-        logger.info("Cron task reply delivered", {
-          taskId,
-          threadId,
-          replyLength: reply.length,
-        });
-      } catch (err) {
-        logger.error("Cron task reply delivery failed", {
-          taskId,
-          threadId,
+    void startTelegramGateway(config, invoke, memory, logger)
+      .then((telegram) => {
+        telegramSender = telegram;
+        logger.info("Telegram sender ready for cron replies");
+      })
+      .catch((err) => {
+        logger.error("Telegram gateway failed to start", {
           message: (err as Error)?.message,
         });
-      }
-    });
+        process.exit(1);
+      });
     return;
   }
 
