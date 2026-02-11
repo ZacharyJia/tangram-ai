@@ -64,8 +64,35 @@ const GraphState = Annotation.Root({
 
 export type AgentGraphState = typeof GraphState.State;
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function buildCurrentTimeContext(now = new Date()): string {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
+  const offsetMinutes = -now.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offsetMinutes);
+  const offsetHours = Math.floor(absOffset / 60);
+  const offsetMins = absOffset % 60;
+  const gmtOffset = `GMT${sign}${pad2(offsetHours)}:${pad2(offsetMins)}`;
+
+  const localDateTime = [
+    `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`,
+    `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`,
+  ].join(" ");
+
+  return [
+    "# Current Time",
+    `current_datetime_local: ${localDateTime} ${gmtOffset} (${timezone})`,
+    `current_datetime_utc: ${now.toISOString()}`,
+    "Treat these timestamps as source of truth for scheduling/time reasoning.",
+  ].join("\n");
+}
+
 function buildInstructions(
   base: string | undefined,
+  currentTimeContext: string,
   memoryContext: string,
   skillsMetadata: string,
   hasFileTools: boolean,
@@ -73,6 +100,7 @@ function buildInstructions(
   hasCronTools: boolean
 ): string | undefined {
   const baseTrimmed = (base ?? "").trim();
+  const timeTrimmed = (currentTimeContext ?? "").trim();
   const memTrimmed = (memoryContext ?? "").trim();
   const skillsTrimmed = (skillsMetadata ?? "").trim();
 
@@ -80,6 +108,10 @@ function buildInstructions(
 
   if (baseTrimmed) {
     blocks.push(baseTrimmed);
+  }
+
+  if (timeTrimmed) {
+    blocks.push(timeTrimmed);
   }
 
   if (memTrimmed) {
@@ -164,10 +196,12 @@ export function createAgentGraph(
         messageCount: state.messages.length,
         pendingToolCalls: state.pendingToolCalls.length,
       });
+      const currentTimeContext = buildCurrentTimeContext();
       const memoryContext = memory ? await memory.getMemoryContext() : "";
       const skillsMetadata = getSkillsMetadata ? getSkillsMetadata() : "";
       const instructions = buildInstructions(
         agentDefaults.systemPrompt,
+        currentTimeContext,
         memoryContext,
         skillsMetadata,
         hasFileTools,
