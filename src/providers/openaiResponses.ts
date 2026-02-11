@@ -1,7 +1,13 @@
 import OpenAI from "openai";
 import type { BaseMessage } from "@langchain/core/messages";
 
-import type { LlmClient } from "./types.js";
+import type {
+  FunctionToolCall,
+  FunctionToolDef,
+  GenerateWithToolsParams,
+  GenerateWithToolsResult,
+  LlmClient,
+} from "./types.js";
 import type { ProviderConfig } from "../config/schema.js";
 
 function toOpenAIRole(msg: BaseMessage): "user" | "assistant" | "system" {
@@ -48,6 +54,23 @@ function extractOutputText(resp: any): string {
   return chunks.join("");
 }
 
+function extractFunctionToolCalls(resp: any): FunctionToolCall[] {
+  const out = resp?.output;
+  if (!Array.isArray(out)) return [];
+
+  const calls: FunctionToolCall[] = [];
+  for (const item of out) {
+    if (!item || item.type !== "function_call") continue;
+    const name = item.name;
+    const callId = item.call_id;
+    const argumentsJson = item.arguments;
+    if (typeof name === "string" && typeof callId === "string" && typeof argumentsJson === "string") {
+      calls.push({ name, callId, argumentsJson });
+    }
+  }
+  return calls;
+}
+
 function shouldFallbackToStreaming(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   // Some OpenAI-compatible gateways return SSE even when stream=false.
@@ -76,67 +99,96 @@ export function createOpenAIResponsesClient(provider: ProviderConfig): LlmClient
     baseURL: provider.baseUrl,
   });
 
-  return {
-    async generateText({ messages, model, temperature, systemPrompt }) {
-      const input: OpenAI.Responses.EasyInputMessage[] = messages.map((m) => ({
-        type: "message" as const,
-        role: toOpenAIRole(m),
-        content: coerceContentToString((m as any).content),
-      }));
+  const createResponse = async (params: GenerateWithToolsParams): Promise<GenerateWithToolsResult> => {
+    const { messages, model, temperature, systemPrompt, tools, toolCallItems, toolOutputs } = params;
+    const messageItems: OpenAI.Responses.EasyInputMessage[] = messages.map((m) => ({
+      type: "message" as const,
+      role: toOpenAIRole(m),
+      content: coerceContentToString((m as any).content),
+    }));
 
-      try {
-        const resp = await client.responses.create({
-          model,
-          input,
-          // "instructions" is the system-level prompt in Responses API.
-          instructions: systemPrompt,
-          temperature,
-          stream: false,
-        });
+    const input: OpenAI.Responses.ResponseInputItem[] = [
+      ...messageItems,
+      ...((toolCallItems ?? []) as any),
+      ...((toolOutputs ?? []) as any),
+    ];
 
-        const text = extractOutputText(resp);
-        if (!text) {
-          throw new Error("OpenAI responses.create returned empty output_text.");
+    const functionTools: OpenAI.Responses.FunctionTool[] | undefined = tools?.map((t: FunctionToolDef) => ({
+      type: "function" as const,
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters ?? null,
+      strict: t.strict ?? true,
+    }));
+
+    try {
+      const resp = await client.responses.create({
+        model,
+        input,
+        instructions: systemPrompt,
+        temperature,
+        tools: functionTools,
+        tool_choice: functionTools && functionTools.length > 0 ? "auto" : undefined,
+        stream: false,
+      });
+
+      return {
+        outputText: extractOutputText(resp),
+        toolCalls: extractFunctionToolCalls(resp),
+      };
+    } catch (err) {
+      if (!shouldFallbackToStreaming(err)) throw err;
+
+      const stream = await client.responses.create({
+        model,
+        input,
+        instructions: systemPrompt,
+        temperature,
+        tools: functionTools,
+        tool_choice: functionTools && functionTools.length > 0 ? "auto" : undefined,
+        stream: true,
+      });
+
+      let acc = "";
+      let doneText = "";
+      let finalResponse: any | undefined;
+
+      for await (const event of stream as any) {
+        if (event?.type === "response.output_text.delta" && typeof event.delta === "string") {
+          acc += event.delta;
         }
-        return text;
-      } catch (err) {
-        if (!shouldFallbackToStreaming(err)) throw err;
-
-        const stream = await client.responses.create({
-          model,
-          input,
-          instructions: systemPrompt,
-          temperature,
-          stream: true,
-        });
-
-        let acc = "";
-        let doneText = "";
-        let finalResponse: any | undefined;
-
-        for await (const event of stream as any) {
-          if (event?.type === "response.output_text.delta" && typeof event.delta === "string") {
-            acc += event.delta;
-          }
-          if (event?.type === "response.output_text.done" && typeof event.text === "string") {
-            doneText = event.text;
-          }
-          if (event?.type === "response.completed" && event.response) {
-            finalResponse = event.response;
-            break;
-          }
-          if (event?.type === "response.failed" && event.response) {
-            finalResponse = event.response;
-            break;
-          }
+        if (event?.type === "response.output_text.done" && typeof event.text === "string") {
+          doneText = event.text;
         }
-
-        const text = finalResponse ? extractOutputText(finalResponse) : doneText || acc;
-        if (!text) {
-          throw new Error("OpenAI responses streaming returned empty output_text.");
+        if (event?.type === "response.completed" && event.response) {
+          finalResponse = event.response;
+          break;
         }
-        return text;
+        if (event?.type === "response.failed" && event.response) {
+          finalResponse = event.response;
+          break;
+        }
       }
+
+      const outputText = finalResponse ? extractOutputText(finalResponse) : doneText || acc;
+      const toolCalls = finalResponse ? extractFunctionToolCalls(finalResponse) : [];
+      return { outputText, toolCalls };
+    }
+  };
+
+  return {
+    async generateWithTools(params: GenerateWithToolsParams): Promise<GenerateWithToolsResult> {
+      return createResponse(params);
+    },
+    async generateText({ messages, model, temperature, systemPrompt }) {
+      const res = await createResponse({ messages, model, temperature, systemPrompt });
+      if (res.toolCalls.length > 0) {
+        throw new Error("generateText received tool calls; use generateWithTools for tool-enabled runs.");
+      }
+      if (!res.outputText) {
+        throw new Error("OpenAI responses.create returned empty output_text.");
+      }
+      return res.outputText;
     },
   };
 }

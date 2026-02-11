@@ -28,6 +28,19 @@ async function appendTextFile(filePath: string, content: string): Promise<void> 
   await fs.writeFile(filePath, next, "utf8");
 }
 
+function isDailyFileName(name: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}\.md$/.test(name);
+}
+
+function* lastNDates(days: number): Generator<string> {
+  const today = new Date();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    d.setUTCDate(d.getUTCDate() - i);
+    yield d.toISOString().slice(0, 10);
+  }
+}
+
 export class MemoryStore {
   readonly workspaceDir: string;
   readonly memoryDir: string;
@@ -95,5 +108,83 @@ export class MemoryStore {
     if (today) parts.push(`## Today's Notes\n${today}`);
 
     return parts.join("\n\n---\n\n");
+  }
+
+  async listDailyFiles(): Promise<string[]> {
+    try {
+      const entries = await fs.readdir(this.memoryDir, { withFileTypes: true });
+      const files = entries
+        .filter((e) => e.isFile() && isDailyFileName(e.name))
+        .map((e) => path.join(this.memoryDir, e.name))
+        .sort()
+        .reverse();
+      return files;
+    } catch (err) {
+      if ((err as any)?.code === "ENOENT") return [];
+      throw err;
+    }
+  }
+
+  private async getDailyFilesToSearch(days: number): Promise<string[]> {
+    if (days === 0) return this.listDailyFiles();
+    const fps: string[] = [];
+    for (const dateStr of lastNDates(days)) {
+      const fp = this.todayFilePath(dateStr);
+      try {
+        await fs.access(fp);
+        fps.push(fp);
+      } catch {
+        // ignore missing
+      }
+    }
+    return fps;
+  }
+
+  async search(
+    query: string,
+    opts?: { days?: number; maxResults?: number }
+  ): Promise<string> {
+    const q = query.trim();
+    if (!q) return "(empty query)";
+
+    const days = opts?.days ?? 30;
+    const maxResults = opts?.maxResults ?? 10;
+    const needle = q.toLowerCase();
+
+    const files: string[] = [];
+    // Prefer long-term first.
+    files.push(this.longTermFile);
+    files.push(...(await this.getDailyFilesToSearch(days)));
+
+    const results: Array<{ file: string; line: number; text: string }> = [];
+
+    for (const fp of files) {
+      const content = await readFileIfExists(fp);
+      if (!content) continue;
+      const lines = content.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.toLowerCase().includes(needle)) {
+          results.push({ file: fp, line: i + 1, text: line.trim() });
+          if (results.length >= maxResults) break;
+        }
+      }
+      if (results.length >= maxResults) break;
+    }
+
+    if (results.length === 0) return "No matches.";
+
+    const rel = (fp: string) => {
+      if (fp.startsWith(this.workspaceDir)) {
+        return fp.slice(this.workspaceDir.length).replace(/^\//, "");
+      }
+      return fp;
+    };
+
+    return [
+      `Found ${results.length} match(es) for: ${q}`,
+      "",
+      ...results.map((r) => `- ${rel(r.file)}:${r.line} ${r.text}`),
+    ].join("\n");
   }
 }

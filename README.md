@@ -38,6 +38,14 @@ Telegram commands:
 - `/remember <text>` append to today's daily memory
 - `/remember_long <text>` append to long-term memory
 
+## Memory Tools (LLM)
+
+The agent exposes function tools to the model (via OpenAI Responses API):
+- `memory_search` search shared memory files
+- `memory_write` append to shared memory files
+
+The LangGraph workflow also runs a post-reply "memory reflection" node that can automatically summarize the latest turn into memory using a strict JSON format prompt.
+
 ## Config
 
 This project supports **multiple provider instances**. Example:
