@@ -52,15 +52,43 @@ function resolveRoots(roots: string[]): string[] {
   return roots.map((r) => path.resolve(expandHome(r)));
 }
 
+function formatOutOfRootsMessage(inputPath: string, candidates: string[], roots: string[]): string {
+  const tipRoot = roots[0];
+  return [
+    "Invalid bash.cwd: path is outside allowed roots.",
+    `requestedCwd: ${inputPath}`,
+    "resolvedCandidates:",
+    ...candidates.map((c) => `- ${c}`),
+    "allowedRoots:",
+    ...roots.map((r) => `- ${r}`),
+    tipRoot ? `Tip: set cwd to an allowed root/subdir, e.g. ${tipRoot}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function resolveAllowedPath(inputPath: string, roots: string[]): string {
-  const abs = path.resolve(expandHome(inputPath));
-  for (const root of roots) {
-    const rel = path.relative(root, abs);
-    if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
-      return abs;
+  const expanded = expandHome(inputPath);
+
+  const candidates: string[] = [];
+  if (path.isAbsolute(expanded)) {
+    candidates.push(path.resolve(expanded));
+  } else {
+    for (const root of roots) {
+      candidates.push(path.resolve(root, expanded));
     }
   }
-  throw new Error(`Path is outside allowed roots: ${inputPath}`);
+
+  for (const candidate of candidates) {
+    for (const root of roots) {
+      const rel = path.relative(root, candidate);
+      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+        return candidate;
+      }
+    }
+  }
+
+  throw new Error(formatOutOfRootsMessage(inputPath, candidates, roots));
 }
 
 function clampOutput(text: string, maxChars: number): string {
@@ -145,4 +173,3 @@ export async function executeBashTool(
     ].join("\n");
   }
 }
-
