@@ -117,6 +117,21 @@ export const ConfigSchema = z
                 storePath: "~/.tangram/workspace/cron-tasks.json",
                 defaultThreadId: "cron",
               }),
+            session: z
+              .object({
+                enabled: z.boolean().optional().default(true),
+                dir: z.string().min(1).optional().default("~/.tangram/workspace/sessions"),
+                restoreMessages: z.number().int().min(1).max(500).optional().default(100),
+                persistAssistantEmpty: z.boolean().optional().default(false),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: true,
+                dir: "~/.tangram/workspace/sessions",
+                restoreMessages: 100,
+                persistAssistantEmpty: false,
+              }),
             model: z.string().min(1).optional(),
             temperature: z.number().min(0).max(2).optional(),
             systemPrompt: z.string().optional(),

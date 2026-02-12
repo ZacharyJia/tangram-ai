@@ -131,6 +131,31 @@ Telegram UX behaviors:
 - bot sends `typing` action while processing
 - during tool-calling loops, progress hints may be sent as temporary `⏳ ...` updates (controlled by `channels.telegram.progressUpdates`, default `true`)
 
+## Session Persistence
+
+Gateway now persists per-thread conversation sessions to JSONL files, so restarts can restore recent context.
+
+- Default directory: `~/.tangram/workspace/sessions`
+- File format: one JSON record per line (user/assistant only)
+- Restore policy: load latest `restoreMessages` records for the current `threadId` before each invoke
+
+Config:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "session": {
+        "enabled": true,
+        "dir": "~/.tangram/workspace/sessions",
+        "restoreMessages": 100,
+        "persistAssistantEmpty": false
+      }
+    }
+  }
+}
+```
+
 ## Memory Tools (LLM)
 
 The agent exposes function tools to the model (via OpenAI Responses API):

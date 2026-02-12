@@ -1,4 +1,4 @@
-import { Annotation, END, MemorySaver, MessagesAnnotation, START, StateGraph } from "@langchain/langgraph";
+import { Annotation, END, MessagesAnnotation, START, StateGraph } from "@langchain/langgraph";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 import type { AppConfig } from "../config/schema.js";
@@ -465,7 +465,5 @@ export function createAgentGraph(
     .addEdge("tools", "llm")
     .addEdge("memory_reflect", END);
 
-  return graph.compile({
-    checkpointer: new MemorySaver(),
-  });
+  return graph.compile();
 }
