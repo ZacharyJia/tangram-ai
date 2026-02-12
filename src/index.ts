@@ -92,8 +92,11 @@ async function runGatewayServiceCommand(action: "status" | "stop" | "restart"): 
     console.error(result.stderr);
   }
   if (result.code !== 0) {
+    if (action === "status") {
+      return;
+    }
     throw new Error(
-      `gateway ${action} failed. If systemd --user is unavailable, use foreground mode: tangram gateway --verbose`
+      `gateway ${action} failed (exit=${result.code}). If systemd --user is unavailable, use foreground mode: tangram gateway --verbose`
     );
   }
 }
