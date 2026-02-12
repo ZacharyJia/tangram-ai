@@ -1,6 +1,7 @@
 import { Telegraf } from "telegraf";
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
+import https from "node:https";
 
 import type { AppConfig } from "../config/schema.js";
 import { splitTelegramMessage } from "../utils/telegram.js";
@@ -23,6 +24,7 @@ const TELEGRAM_LAUNCH_INITIAL_BACKOFF_MS = 2000;
 const TELEGRAM_COMMAND_TIMEOUT_MS = 8 * 1000;
 const TELEGRAM_COMMAND_MAX_ATTEMPTS = 3;
 const TELEGRAM_COMMAND_INITIAL_BACKOFF_MS = 1500;
+const TELEGRAM_FORCE_IPV4 = process.env.TANGRAM_TELEGRAM_FORCE_IPV4 !== "0";
 
 const TELEGRAM_COMMANDS = [
   { command: "new", description: "Start a new session" },
@@ -155,13 +157,23 @@ export async function startTelegramGateway(
     throw new Error("Telegram token is required when channels.telegram.enabled=true");
   }
 
+  const telegramAgent = new https.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 10_000,
+    family: TELEGRAM_FORCE_IPV4 ? 4 : 0,
+  });
+
   const bot = new Telegraf(tg.token, {
     handlerTimeout: TELEGRAM_HANDLER_TIMEOUT_MS,
+    telegram: {
+      agent: telegramAgent,
+    },
   });
   let lastSeenChatId: string | undefined;
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
     progressUpdates: tg.progressUpdates !== false,
+    forceIpv4: TELEGRAM_FORCE_IPV4,
   });
 
   const replyText = async (ctx: any, text: string) => {
