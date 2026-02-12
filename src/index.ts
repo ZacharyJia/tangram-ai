@@ -253,19 +253,24 @@ async function runGatewayLoop(): Promise<void> {
     const finalReply = rawReply || "(empty reply)";
 
     if (sessionStore) {
-      try {
-        await sessionStore.appendUserMessage(threadId, text);
-
-        const assistantText = rawReply || (sessionCfg.persistAssistantEmpty ? finalReply : "");
-        if (assistantText) {
-          await sessionStore.appendAssistantMessage(threadId, assistantText);
+      const assistantText = rawReply || (sessionCfg.persistAssistantEmpty ? finalReply : "");
+      void (async () => {
+        try {
+          await withTimeout(sessionStore.appendUserMessage(threadId, text), 1500, "session append user");
+          if (assistantText) {
+            await withTimeout(
+              sessionStore.appendAssistantMessage(threadId, assistantText),
+              1500,
+              "session append assistant"
+            );
+          }
+        } catch (err) {
+          logger.warn("Session persist failed", {
+            threadId,
+            message: (err as Error)?.message,
+          });
         }
-      } catch (err) {
-        logger.warn("Session persist failed", {
-          threadId,
-          message: (err as Error)?.message,
-        });
-      }
+      })();
     }
 
     return finalReply;
@@ -352,6 +357,22 @@ function formatSecurityWarning(message: string): string {
   const bold = "\x1b[1m";
   const reset = "\x1b[0m";
   return `${bold}${red}⚠ SECURITY WARNING${reset} ${yellow}${message}${reset}`;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${label} timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function main() {
