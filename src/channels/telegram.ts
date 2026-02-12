@@ -20,6 +20,16 @@ const TELEGRAM_HANDLER_TIMEOUT_MS = 10 * 60 * 1000;
 const TELEGRAM_LAUNCH_TIMEOUT_MS = 120 * 1000;
 const TELEGRAM_LAUNCH_MAX_ATTEMPTS = 5;
 const TELEGRAM_LAUNCH_INITIAL_BACKOFF_MS = 2000;
+const TELEGRAM_COMMAND_TIMEOUT_MS = 15 * 1000;
+
+const TELEGRAM_COMMANDS = [
+  { command: "new", description: "Start a new session" },
+  { command: "whoami", description: "Show your Telegram identity" },
+  { command: "skill", description: "List installed skills" },
+  { command: "memory", description: "Show current memory context" },
+  { command: "remember", description: "Save note to today's memory" },
+  { command: "remember_long", description: "Save note to long-term memory" },
+] as const;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -97,6 +107,7 @@ export async function startTelegramGateway(
   const bot = new Telegraf(tg.token, {
     handlerTimeout: TELEGRAM_HANDLER_TIMEOUT_MS,
   });
+  const commandScopesSynced = new Set<string>();
   let lastSeenChatId: string | undefined;
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
@@ -121,7 +132,49 @@ export async function startTelegramGateway(
     }
   };
 
+  const setCommands = async (label: string, extra?: Record<string, unknown>) => {
+    await withTimeout(
+      bot.telegram.setMyCommands(TELEGRAM_COMMANDS as any, extra as any),
+      TELEGRAM_COMMAND_TIMEOUT_MS,
+      `telegram setMyCommands (${label})`
+    );
+  };
+
+  const syncCommandsForChatScope = async (chatId: string, userId: string): Promise<void> => {
+    const key = `${chatId}:${userId}`;
+    if (commandScopesSynced.has(key)) return;
+
+    const isNumericChatId = /^-?\d+$/.test(chatId);
+    const isNumericUserId = /^\d+$/.test(userId);
+    if (!isNumericChatId || !isNumericUserId) return;
+
+    const chatIdNum = Number(chatId);
+    const userIdNum = Number(userId);
+    if (!Number.isSafeInteger(chatIdNum) || !Number.isSafeInteger(userIdNum)) return;
+
+    await setCommands(`chat:${chatId}`, {
+      scope: { type: "chat", chat_id: chatIdNum },
+    });
+    await setCommands(`chat_member:${chatId}:${userId}`, {
+      scope: { type: "chat_member", chat_id: chatIdNum, user_id: userIdNum },
+    });
+
+    commandScopesSynced.add(key);
+    logger?.info("Telegram bot commands synced for chat scopes", { chatId, userId });
+  };
+
   bot.start(async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? "");
+    const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
+    try {
+      await syncCommandsForChatScope(chatId, userId);
+    } catch (err) {
+      logger?.warn("Telegram per-chat command sync failed on /start", {
+        chatId,
+        userId,
+        message: (err as Error)?.message,
+      });
+    }
     await replyText(ctx, "Connected. Send me a message.");
   });
 
@@ -294,6 +347,16 @@ export async function startTelegramGateway(
     }
 
     try {
+      await syncCommandsForChatScope(chatId, userId);
+    } catch (err) {
+      logger?.warn("Telegram per-chat command sync failed", {
+        chatId,
+        userId,
+        message: (err as Error)?.message,
+      });
+    }
+
+    try {
       const stopTyping = createTypingLoop(ctx, chatId);
       const progressThrottleMs = 1200;
       let lastProgressAt = 0;
@@ -376,26 +439,17 @@ export async function startTelegramGateway(
     throw new Error("Telegram bot launch failed: exhausted retries");
   }
 
-  const commands = [
-    { command: "new", description: "Start a new session" },
-    { command: "whoami", description: "Show your Telegram identity" },
-    { command: "skill", description: "List installed skills" },
-    { command: "memory", description: "Show current memory context" },
-    { command: "remember", description: "Save note to today's memory" },
-    { command: "remember_long", description: "Save note to long-term memory" },
-  ];
-
   try {
-    await bot.telegram.setMyCommands(commands);
-    await bot.telegram.setMyCommands(commands, {
+    await setCommands("default");
+    await setCommands("all_private_chats", {
       scope: { type: "all_private_chats" },
     });
     logger?.info("Telegram bot commands registered", {
       scopes: ["default", "all_private_chats"],
-      commandCount: commands.length,
+      commandCount: TELEGRAM_COMMANDS.length,
     });
   } catch (err) {
-    logger?.warn("Telegram bot command registration failed", {
+    logger?.error("Telegram bot command registration failed", {
       message: (err as Error)?.message,
     });
   }
