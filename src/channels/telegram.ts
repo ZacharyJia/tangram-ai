@@ -15,6 +15,25 @@ type InvokeFn = (params: {
 }) => Promise<string>;
 
 const TELEGRAM_HANDLER_TIMEOUT_MS = 10 * 60 * 1000;
+const TELEGRAM_LAUNCH_TIMEOUT_MS = 120 * 1000;
+const TELEGRAM_LAUNCH_MAX_ATTEMPTS = 5;
+const TELEGRAM_LAUNCH_INITIAL_BACKOFF_MS = 2000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${label} timeout after ${timeoutMs} milliseconds`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export type TelegramPush = {
   sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
@@ -252,16 +271,40 @@ export async function startTelegramGateway(
     }
   });
 
-  void bot
-    .launch()
-    .then(() => {
-      logger?.info("Telegram bot launched");
-    })
-    .catch((err) => {
-      logger?.error("Telegram bot launch failed", {
-        message: (err as Error)?.message,
+  let backoffMs = TELEGRAM_LAUNCH_INITIAL_BACKOFF_MS;
+  let launched = false;
+  for (let attempt = 1; attempt <= TELEGRAM_LAUNCH_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await withTimeout(bot.launch(), TELEGRAM_LAUNCH_TIMEOUT_MS, "telegram launch");
+      logger?.info("Telegram bot launched", { attempt });
+      launched = true;
+      break;
+    } catch (err) {
+      const message = (err as Error)?.message ?? "unknown error";
+      const finalAttempt = attempt >= TELEGRAM_LAUNCH_MAX_ATTEMPTS;
+      if (finalAttempt) {
+        logger?.error("Telegram bot launch failed", {
+          attempt,
+          maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
+          message,
+        });
+        throw err;
+      }
+
+      logger?.warn("Telegram bot launch failed, retrying", {
+        attempt,
+        maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
+        backoffMs,
+        message,
       });
-    });
+      await sleep(backoffMs);
+      backoffMs = Math.min(backoffMs * 2, 30000);
+    }
+  }
+
+  if (!launched) {
+    throw new Error("Telegram bot launch failed: exhausted retries");
+  }
 
   // Graceful shutdown.
   const stop = () => bot.stop("SIGTERM");
