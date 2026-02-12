@@ -14,6 +14,8 @@ type InvokeFn = (params: {
   onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
 }) => Promise<string>;
 
+const TELEGRAM_HANDLER_TIMEOUT_MS = 10 * 60 * 1000;
+
 export type TelegramPush = {
   sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
 };
@@ -68,7 +70,9 @@ export async function startTelegramGateway(
     throw new Error("Telegram token is required when channels.telegram.enabled=true");
   }
 
-  const bot = new Telegraf(tg.token);
+  const bot = new Telegraf(tg.token, {
+    handlerTimeout: TELEGRAM_HANDLER_TIMEOUT_MS,
+  });
   let lastSeenChatId: string | undefined;
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
@@ -95,6 +99,15 @@ export async function startTelegramGateway(
 
   bot.start(async (ctx) => {
     await replyText(ctx, "Connected. Send me a message.");
+  });
+
+  bot.catch((err, ctx) => {
+    logger?.error("Telegram update handler failed", {
+      message: (err as Error)?.message,
+      updateType: ctx?.updateType,
+      chatId: String(ctx?.chat?.id ?? ""),
+      userId: String(ctx?.from?.id ?? ""),
+    });
   });
 
   bot.command("memory", async (ctx) => {
@@ -216,6 +229,7 @@ export async function startTelegramGateway(
         const reply = await withKeyLock(chatId, async () => invoke({ threadId: chatId, text, onProgress }));
         logger?.debug("Outgoing reply", { chatId, length: reply.length });
         await replyText(ctx, reply);
+        logger?.debug("Outgoing reply delivered", { chatId, length: reply.length });
       } finally {
         stopTyping();
       }
