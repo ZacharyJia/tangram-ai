@@ -9,7 +9,7 @@ import { executeMemoryTool, memoryToolDefs } from "../tools/memoryTools.js";
 import { executeFileTool, fileToolDefs } from "../tools/fileTools.js";
 import { bashToolDefs, executeBashTool } from "../tools/bashTool.js";
 import { cronToolDefs, executeCronTool } from "../tools/cronTools.js";
-import { resolveSkillRoots } from "../skills/catalog.js";
+import { expandHome } from "../utils/path.js";
 import type { Logger } from "../utils/logger.js";
 import type { CronStore } from "../scheduler/cronStore.js";
 
@@ -126,7 +126,7 @@ function buildInstructions(
     "# Tools",
     "You may use these tools when helpful:",
     "- memory_search: search shared memory files to recall past details",
-    "- memory_write: write stable facts/preferences/decisions to shared memory",
+    "- use file_read/file_write/file_edit to read/write memory files when you need to persist updates",
     "Do NOT store secrets (API keys, tokens, passwords).",
   ];
 
@@ -134,8 +134,8 @@ function buildInstructions(
     toolLines.splice(
       4,
       0,
-      "- file_read: read skill files or other allowed local text files",
-      "- file_write: write/update allowed local files when needed",
+      "- file_read: read local text files",
+      "- file_write: write/update local files when needed",
       "- file_edit: edit files by targeted replace operations"
     );
   }
@@ -172,8 +172,10 @@ export function createAgentGraph(
 ) {
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
-  const skillRoots = resolveSkillRoots(config);
-  const hasFileTools = skillRoots.length > 0;
+  const filesCfg = agentDefaults.files;
+  const hasFileTools = Boolean(filesCfg?.enabled);
+  const fileRoots = (filesCfg?.roots ?? ["~/.tangram"]).map((root) => expandHome(root));
+  const fileDefaultCwd = expandHome(agentDefaults.workspace ?? "~/.tangram/workspace");
   const shellCfg = agentDefaults.shell;
   const hasBashTool = Boolean(shellCfg?.enabled);
   const cronCfg = agentDefaults.cron;
@@ -295,7 +297,7 @@ export function createAgentGraph(
       logger?.debug("Graph node: tools", {
         pendingToolCalls: state.pendingToolCalls.map((c) => c.name),
       });
-      if (!memory && skillRoots.length === 0 && !hasBashTool && !hasCronTools) {
+      if (!memory && !hasFileTools && !hasBashTool && !hasCronTools) {
         return { pendingToolCalls: [], toolOutputs: [] };
       }
 
@@ -313,7 +315,7 @@ export function createAgentGraph(
           logger
         );
 
-        if (call.name === "memory_search" || call.name === "memory_write") {
+        if (call.name === "memory_search") {
           if (!memory) {
             output = "Memory tool unavailable: memory store is not initialized.";
           } else {
@@ -327,7 +329,11 @@ export function createAgentGraph(
           logger?.debug("Execute file tool", { name: call.name, callId: call.callId });
           output = await executeFileTool(
             { name: call.name, callId: call.callId, argumentsJson: call.argumentsJson },
-            { allowedRoots: skillRoots }
+            {
+              allowedRoots: fileRoots,
+              fullAccess: Boolean(filesCfg?.fullAccess),
+              defaultCwd: fileDefaultCwd,
+            }
           );
         } else if (call.name === "bash") {
           logger?.debug("Execute bash tool", { name: call.name, callId: call.callId });
