@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "",
   "main": "dist/index.js",
+  "bin": {
+    "tangram2": "dist/index.js"
+  },
   "scripts": {
     "dev": "tsx src/index.ts gateway",
     "build": "tsc -p tsconfig.json",

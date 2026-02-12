@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
 
 import { getAppPaths } from "./paths.js";
 
@@ -8,6 +10,14 @@ type CmdResult = {
   stdout: string;
   stderr: string;
 };
+
+function resolveUserNpmBin(): string {
+  const home = os.homedir();
+  if (process.platform === "win32") {
+    return path.join(home, "AppData", "Roaming", "npm");
+  }
+  return path.join(home, ".npm-global", "bin");
+}
 
 function runCmd(command: string, args: string[]): Promise<CmdResult> {
   return new Promise((resolve, reject) => {
@@ -42,6 +52,7 @@ export async function ensureServiceFile(options?: { description?: string }): Pro
   await fs.mkdir(paths.systemdUserDir, { recursive: true });
 
   const description = options?.description ?? "Tangram2 Gateway";
+  const npmBin = resolveUserNpmBin();
   const unit = [
     "[Unit]",
     `Description=${description}`,
@@ -49,8 +60,9 @@ export async function ensureServiceFile(options?: { description?: string }): Pro
     "",
     "[Service]",
     "Type=simple",
-    `WorkingDirectory=${paths.currentLink}`,
-    `ExecStart=/usr/bin/env node ${paths.currentGatewayEntrypoint} gateway --config ${paths.configPath}`,
+    `WorkingDirectory=${paths.baseDir}`,
+    `Environment=PATH=${npmBin}:/usr/local/bin:/usr/bin:/bin`,
+    `ExecStart=${npmBin}/tangram2 gateway --config ${paths.configPath}`,
     "Restart=always",
     "RestartSec=3",
     "",

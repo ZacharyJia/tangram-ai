@@ -60,7 +60,7 @@ npm run rollback -- --to v0.0.1
 ```
 
 Notes:
-- `upgrade` defaults to latest GitHub Release and auto-restarts service
+- `upgrade` uses global npm install (`npm install -g tangram2@...`) and auto-restarts service
 - use `--no-restart` to skip restart
 - if `systemd --user` is unavailable, run foreground mode: `npm run gateway -- --verbose`
 
@@ -108,7 +108,7 @@ Run `npm run onboard` for an interactive setup that:
 - asks for provider/API/Telegram settings
 - applies developer-default permissions (shell enabled but restricted)
 - initializes `~/.tangram2` directories and baseline files
-- initializes release directories under `~/.tangram2/app`
+- initializes runtime directories under `~/.tangram2/app`
 - can install/start user-level `systemd` service
 - handles existing files one by one (`overwrite` / `skip` / `backup then overwrite`)
 

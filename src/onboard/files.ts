@@ -13,8 +13,6 @@ type WriteResult =
 export type OnboardPaths = {
   baseDir: string;
   appDir: string;
-  releasesDir: string;
-  downloadsDir: string;
   workspaceDir: string;
   skillsDir: string;
   configPath: string;
@@ -26,16 +24,12 @@ export type OnboardPaths = {
 export function getDefaultOnboardPaths(): OnboardPaths {
   const baseDir = path.join(os.homedir(), ".tangram2");
   const appDir = path.join(baseDir, "app");
-  const releasesDir = path.join(appDir, "releases");
-  const downloadsDir = path.join(appDir, "downloads");
   const workspaceDir = path.join(baseDir, "workspace");
   const skillsDir = path.join(baseDir, "skills");
 
   return {
     baseDir,
     appDir,
-    releasesDir,
-    downloadsDir,
     workspaceDir,
     skillsDir,
     configPath: path.join(baseDir, "config.json"),
@@ -120,8 +114,6 @@ async function writeWithPolicy(filePath: string, content: string): Promise<Write
 export async function ensureOnboardDirs(paths: OnboardPaths): Promise<void> {
   await fs.mkdir(paths.baseDir, { recursive: true });
   await fs.mkdir(paths.appDir, { recursive: true });
-  await fs.mkdir(paths.releasesDir, { recursive: true });
-  await fs.mkdir(paths.downloadsDir, { recursive: true });
   await fs.mkdir(paths.workspaceDir, { recursive: true });
   await fs.mkdir(paths.skillsDir, { recursive: true });
 }

@@ -1,6 +1,4 @@
 import "dotenv/config";
-import fs from "node:fs/promises";
-import path from "node:path";
 
 import { HumanMessage } from "@langchain/core/messages";
 
@@ -15,7 +13,6 @@ import { CronStore } from "./scheduler/cronStore.js";
 import { CronRunner } from "./scheduler/cronRunner.js";
 import { HeartbeatRunner } from "./scheduler/heartbeat.js";
 import { runOnboard } from "./onboard/run.js";
-import { getAppPaths } from "./deploy/paths.js";
 import { restartService, statusService, stopService } from "./deploy/systemdUser.js";
 import { runRollback, runUpgrade } from "./deploy/upgrade.js";
 
@@ -86,30 +83,9 @@ async function runGatewayServiceCommand(action: "status" | "stop" | "restart"): 
   }
   if (result.code !== 0) {
     throw new Error(
-      `gateway ${action} failed. If systemd --user is unavailable, use foreground mode: npm run dev -- gateway --verbose`
+      `gateway ${action} failed. If systemd --user is unavailable, use foreground mode: npm run gateway -- --verbose`
     );
   }
-}
-
-async function readCurrentReleaseVersion(): Promise<string | undefined> {
-  const p = getAppPaths();
-  let linkTarget: string;
-  try {
-    linkTarget = await fs.readlink(p.currentLink);
-  } catch {
-    return undefined;
-  }
-
-  const packagePath = path.join(linkTarget, "package.json");
-  try {
-    const raw = await fs.readFile(packagePath, "utf8");
-    const parsed = JSON.parse(raw) as { version?: string };
-    if (parsed.version) return parsed.version;
-  } catch {
-    return path.basename(linkTarget);
-  }
-
-  return path.basename(linkTarget);
 }
 
 async function runUpgradeCommand(): Promise<void> {
@@ -130,7 +106,7 @@ async function runUpgradeCommand(): Promise<void> {
       `- version: ${result.version}`,
       `- changed: ${result.changed}`,
       `- restarted: ${result.restarted}`,
-      result.downloadPath ? `- artifact: ${result.downloadPath}` : "",
+      result.previousVersion ? `- previousVersion: ${result.previousVersion}` : "",
     ]
       .filter(Boolean)
       .join("\n")
@@ -341,16 +317,6 @@ async function main() {
   const sub = findGatewaySubcommand();
   if (sub === "status" || sub === "stop" || sub === "restart") {
     await runGatewayServiceCommand(sub);
-    if (sub === "status") {
-      const paths = getAppPaths();
-      const version = await readCurrentReleaseVersion();
-      // eslint-disable-next-line no-console
-      console.log(`\nService file: ${paths.serviceFilePath}`);
-      if (version) {
-        // eslint-disable-next-line no-console
-        console.log(`Current release: ${version}`);
-      }
-    }
     return;
   }
 

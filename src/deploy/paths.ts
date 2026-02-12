@@ -4,11 +4,7 @@ import path from "node:path";
 export type AppPaths = {
   baseDir: string;
   appDir: string;
-  releasesDir: string;
-  downloadsDir: string;
-  currentLink: string;
-  currentGatewayEntrypoint: string;
-  previousLink: string;
+  upgradeStatePath: string;
   configPath: string;
   systemdUserDir: string;
   serviceFilePath: string;
@@ -23,11 +19,7 @@ export function getAppPaths(): AppPaths {
   return {
     baseDir,
     appDir,
-    releasesDir: path.join(appDir, "releases"),
-    downloadsDir: path.join(appDir, "downloads"),
-    currentLink: path.join(appDir, "current"),
-    currentGatewayEntrypoint: path.join(appDir, "current", "dist", "index.js"),
-    previousLink: path.join(appDir, "previous"),
+    upgradeStatePath: path.join(appDir, "upgrade-state.json"),
     configPath: path.join(baseDir, "config.json"),
     systemdUserDir,
     serviceFilePath: path.join(systemdUserDir, "tangram2.service"),
