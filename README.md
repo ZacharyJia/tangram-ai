@@ -308,8 +308,6 @@ This project supports **multiple provider instances**. Example:
 
 Config lookup order:
 - `--config <path>`
-- `TANGRAM_AI_CONFIG` (preferred)
-- `TANGRAM2_CONFIG` (legacy compatibility)
-- `~/.tangram-ai/config.json` (preferred)
-- `~/.tangram2/config.json` (legacy compatibility)
-- `./config.json` (legacy fallback)
+- `TANGRAM_AI_CONFIG`
+- `~/.tangram-ai/config.json`
+- `./config.json` (local fallback)

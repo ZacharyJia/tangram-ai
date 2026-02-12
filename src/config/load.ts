@@ -20,17 +20,11 @@ async function fileExists(p: string): Promise<boolean> {
 
 export async function resolveConfigPath(explicitPath?: string): Promise<string> {
   const homeConfig = path.join(os.homedir(), ".tangram-ai", "config.json");
-  const legacyHomeConfig = path.join(os.homedir(), ".tangram2", "config.json");
   const candidates: Array<string | undefined> = [
     explicitPath,
     process.env.TANGRAM_AI_CONFIG,
-    // Back-compat env var.
-    process.env.TANGRAM2_CONFIG,
-    // Back-compat from earlier MVP naming.
-    process.env.NANOGRAPHBOT_CONFIG,
     homeConfig,
-    legacyHomeConfig,
-    // Legacy fallback for older local-dev setups.
+    // Optional local fallback for local-dev setups.
     path.resolve(process.cwd(), "config.json"),
   ];
 

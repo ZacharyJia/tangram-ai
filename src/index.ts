@@ -65,7 +65,7 @@ function usage(exitCode = 0) {
       "  1) --config <path>",
       "  2) $TANGRAM_AI_CONFIG",
       "  3) ~/.tangram-ai/config.json",
-      "  4) ./config.json (legacy fallback)",
+      "  4) ./config.json (local fallback)",
     ].join("\n")
   );
   process.exit(exitCode);
