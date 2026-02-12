@@ -88,23 +88,16 @@ After this setup, pushing a version tag (for example `v0.0.2`) will publish `tan
 
 ### Local release commands
 
-- Bump version only:
+- Create release commit + tag (pass through any npm version target):
 
 ```bash
-npm run release:patch
-npm run release:minor
-npm run release:major
+npm run release -- 0.1.0
+npm run release -- patch
+npm run release -- minor
+npm run release -- major
 ```
 
-- Prepare a full release (bump version + build + commit + tag):
-
-```bash
-npm run release:prepare:patch
-npm run release:prepare:minor
-npm run release:prepare:major
-```
-
-After `release:prepare:*` completes, push branch and tag:
+After `npm run release -- <target>` completes, push branch and tag:
 
 ```bash
 git push origin master
