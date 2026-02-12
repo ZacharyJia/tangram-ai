@@ -28,12 +28,11 @@ function hasFlag(...flags: string[]): boolean {
   return flags.some((flag) => process.argv.includes(flag));
 }
 
-function getPositionalArgs(fromIndex = 3): string[] {
-  return process.argv.slice(fromIndex).filter((arg) => !arg.startsWith("-"));
-}
+type GatewaySubcommand = "status" | "stop" | "restart";
 
-function findGatewaySubcommand(): "status" | "stop" | "restart" | undefined {
+function parseGatewayArgs(): { subcommand?: GatewaySubcommand; unknownArg?: string } {
   const known = new Set(["status", "stop", "restart"]);
+  let subcommand: GatewaySubcommand | undefined;
 
   for (let i = 3; i < process.argv.length; i++) {
     const arg = process.argv[i];
@@ -41,12 +40,21 @@ function findGatewaySubcommand(): "status" | "stop" | "restart" | undefined {
       i += 1;
       continue;
     }
+    if (arg.startsWith("--config=")) {
+      continue;
+    }
     if (arg === "--verbose" || arg === "-v") continue;
     if (arg.startsWith("-")) continue;
-    if (known.has(arg)) return arg as "status" | "stop" | "restart";
-    return undefined;
+    if (known.has(arg)) {
+      if (!subcommand) {
+        subcommand = arg as GatewaySubcommand;
+        continue;
+      }
+      return { subcommand, unknownArg: arg };
+    }
+    return { subcommand, unknownArg: arg };
   }
-  return undefined;
+  return { subcommand };
 }
 
 function usage(exitCode = 0) {
@@ -316,15 +324,15 @@ async function main() {
     usage(1);
   }
 
-  const sub = findGatewaySubcommand();
+  const parsedGatewayArgs = parseGatewayArgs();
+  const sub = parsedGatewayArgs.subcommand;
   if (sub === "status" || sub === "stop" || sub === "restart") {
     await runGatewayServiceCommand(sub);
     return;
   }
 
-  const firstPositional = getPositionalArgs(3)[0];
-  if (firstPositional) {
-    throw new Error(`Unknown gateway subcommand: ${firstPositional}`);
+  if (parsedGatewayArgs.unknownArg) {
+    throw new Error(`Unknown gateway subcommand: ${parsedGatewayArgs.unknownArg}`);
   }
 
   await runGatewayLoop();
