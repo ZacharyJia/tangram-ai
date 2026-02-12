@@ -130,6 +130,9 @@ Telegram commands:
 - `/memory` show memory context
 - `/remember <text>` append to today's daily memory
 - `/remember_long <text>` append to long-term memory
+- `/new` start a new chat session (clear stored session history for current chat)
+- `/whoami` show current Telegram user/chat identity
+- `/skill` list installed skills currently discovered by runtime
 
 Telegram UX behaviors:
 - bot sends `typing` action while processing
