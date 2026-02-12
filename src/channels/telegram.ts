@@ -39,6 +39,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 
 export type TelegramPush = {
   sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
+  stop: () => void;
 };
 
 function createTypingLoop(ctx: any, chatId: string) {
@@ -375,26 +376,37 @@ export async function startTelegramGateway(
     throw new Error("Telegram bot launch failed: exhausted retries");
   }
 
+  const commands = [
+    { command: "new", description: "Start a new session" },
+    { command: "whoami", description: "Show your Telegram identity" },
+    { command: "skill", description: "List installed skills" },
+    { command: "memory", description: "Show current memory context" },
+    { command: "remember", description: "Save note to today's memory" },
+    { command: "remember_long", description: "Save note to long-term memory" },
+  ];
+
   try {
-    await bot.telegram.setMyCommands([
-      { command: "new", description: "Start a new session" },
-      { command: "whoami", description: "Show your Telegram identity" },
-      { command: "skill", description: "List installed skills" },
-      { command: "memory", description: "Show current memory context" },
-      { command: "remember", description: "Save note to today's memory" },
-      { command: "remember_long", description: "Save note to long-term memory" },
-    ]);
-    logger?.info("Telegram bot commands registered");
+    await bot.telegram.setMyCommands(commands);
+    await bot.telegram.setMyCommands(commands, {
+      scope: { type: "all_private_chats" },
+    });
+    logger?.info("Telegram bot commands registered", {
+      scopes: ["default", "all_private_chats"],
+      commandCount: commands.length,
+    });
   } catch (err) {
     logger?.warn("Telegram bot command registration failed", {
       message: (err as Error)?.message,
     });
   }
 
-  // Graceful shutdown.
-  const stop = () => bot.stop("SIGTERM");
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    bot.stop("SIGTERM");
+    logger?.info("Telegram bot stopped");
+  };
 
-  return { sendToThread };
+  return { sendToThread, stop };
 }

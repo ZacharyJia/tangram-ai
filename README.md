@@ -51,6 +51,10 @@ npm run gateway -- stop
 npm run gateway -- restart
 ```
 
+Service stop/restart latency notes:
+- gateway now exits immediately on `SIGTERM`/`SIGINT` after local cleanup
+- generated user `systemd` unit sets `TimeoutStopSec=20` to avoid long stop hangs
+
 Upgrade and rollback:
 
 ```bash

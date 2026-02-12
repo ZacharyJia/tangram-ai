@@ -294,7 +294,12 @@ async function runGatewayLoop(): Promise<void> {
     logger,
   });
 
-  let telegramSender: { sendToThread: (params: { threadId: string; text: string }) => Promise<void> } | undefined;
+  let telegramSender:
+    | {
+        sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
+        stop: () => void;
+      }
+    | undefined;
   cronRunner.setOnTaskReply(async ({ threadId, taskId, reply }) => {
     if (!telegramSender) {
       logger.warn("Cron task reply skipped: telegram sender not ready", {
@@ -324,18 +329,35 @@ async function runGatewayLoop(): Promise<void> {
   cronRunner.start();
 
   let shutdownDone = false;
-  const shutdown = () => {
+  const shutdown = (signal?: string) => {
     if (shutdownDone) return;
     shutdownDone = true;
+
+    logger.info("Gateway shutdown start", { signal: signal ?? "unknown" });
+
+    try {
+      telegramSender?.stop();
+    } catch (err) {
+      logger.warn("Gateway shutdown: telegram stop failed", {
+        message: (err as Error)?.message,
+      });
+    }
+
     heartbeatRunner.stop();
     cronRunner.stop();
     skillsRuntime.stop();
     logger.info("Gateway shutdown complete");
   };
 
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
-  process.once("beforeExit", shutdown);
+  process.once("SIGINT", () => {
+    shutdown("SIGINT");
+    process.exit(0);
+  });
+  process.once("SIGTERM", () => {
+    shutdown("SIGTERM");
+    process.exit(0);
+  });
+  process.once("beforeExit", () => shutdown("beforeExit"));
 
   if (config.channels.telegram?.enabled) {
     telegramSender = await startTelegramGateway(
