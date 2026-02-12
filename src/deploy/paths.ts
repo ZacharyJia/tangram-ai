@@ -22,6 +22,6 @@ export function getAppPaths(): AppPaths {
     upgradeStatePath: path.join(appDir, "upgrade-state.json"),
     configPath: path.join(baseDir, "config.json"),
     systemdUserDir,
-    serviceFilePath: path.join(systemdUserDir, "tangram2.service"),
+    serviceFilePath: path.join(systemdUserDir, "tangram.service"),
   };
 }

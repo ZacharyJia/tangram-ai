@@ -1,10 +1,10 @@
 {
-  "name": "tangram2",
+  "name": "tangram-ai",
   "version": "0.0.1",
   "description": "",
   "main": "dist/index.js",
   "bin": {
-    "tangram2": "dist/index.js"
+    "tangram": "dist/index.js"
   },
   "scripts": {
     "dev": "tsx src/index.ts gateway",

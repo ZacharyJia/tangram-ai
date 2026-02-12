@@ -29,6 +29,8 @@ type CmdResult = {
   stderr: string;
 };
 
+const PACKAGE_NAME = "tangram-ai";
+
 function runCmd(command: string, args: string[]): Promise<CmdResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -78,29 +80,21 @@ async function writeState(state: UpgradeState): Promise<void> {
   await fs.writeFile(p.upgradeStatePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-async function readInstalledVersion(): Promise<string> {
-  const result = await runCmd("npm", ["view", "tangram2", "version"]);
-  if (result.code !== 0) {
-    throw new Error(`Failed to query npm package version: ${result.stderr || result.stdout}`);
-  }
-  return result.stdout.trim();
-}
-
 async function installGlobalVersion(target: string): Promise<void> {
-  const result = await runCmd("npm", ["install", "-g", `tangram2@${target}`]);
+  const result = await runCmd("npm", ["install", "-g", `${PACKAGE_NAME}@${target}`]);
   if (result.code !== 0) {
     throw new Error(`npm global install failed: ${result.stderr || result.stdout}`);
   }
 }
 
 async function tryGetCurrentGlobalVersion(): Promise<string | undefined> {
-  const result = await runCmd("npm", ["list", "-g", "tangram2", "--depth=0", "--json"]);
+  const result = await runCmd("npm", ["list", "-g", PACKAGE_NAME, "--depth=0", "--json"]);
   if (result.code !== 0) return undefined;
   try {
     const parsed = JSON.parse(result.stdout) as {
       dependencies?: Record<string, { version?: string }>;
     };
-    const version = parsed.dependencies?.tangram2?.version;
+    const version = parsed.dependencies?.[PACKAGE_NAME]?.version;
     return version;
   } catch {
     return undefined;
@@ -133,7 +127,10 @@ export async function runUpgrade(options: UpgradeOptions): Promise<UpgradeResult
   }
 
   await installGlobalVersion(target);
-  const installed = await readInstalledVersion();
+  const installed = await tryGetCurrentGlobalVersion();
+  if (!installed) {
+    throw new Error(`Cannot determine installed ${PACKAGE_NAME} version after upgrade.`);
+  }
 
   const state = await readState();
   await writeState({
@@ -173,7 +170,10 @@ export async function runRollback(options?: { to?: string; restart?: boolean }):
   }
 
   await installGlobalVersion(target);
-  const installed = await readInstalledVersion();
+  const installed = await tryGetCurrentGlobalVersion();
+  if (!installed) {
+    throw new Error(`Cannot determine installed ${PACKAGE_NAME} version after rollback.`);
+  }
 
   await writeState({
     previousVersion: state.lastVersion,
@@ -187,4 +187,3 @@ export async function runRollback(options?: { to?: string; restart?: boolean }):
     restarted,
   };
 }
-

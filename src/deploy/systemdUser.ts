@@ -62,7 +62,7 @@ export async function ensureServiceFile(options?: { description?: string }): Pro
     "Type=simple",
     `WorkingDirectory=${paths.baseDir}`,
     `Environment=PATH=${npmBin}:/usr/local/bin:/usr/bin:/bin`,
-    `ExecStart=${npmBin}/tangram2 gateway --config ${paths.configPath}`,
+    `ExecStart=${npmBin}/tangram gateway --config ${paths.configPath}`,
     "Restart=always",
     "RestartSec=3",
     "",
@@ -92,23 +92,23 @@ export async function daemonReload(): Promise<CmdResult> {
 }
 
 export async function enableService(): Promise<CmdResult> {
-  return runCmd("systemctl", ["--user", "enable", "tangram2"]);
+  return runCmd("systemctl", ["--user", "enable", "tangram"]);
 }
 
 export async function startService(): Promise<CmdResult> {
-  return runCmd("systemctl", ["--user", "start", "tangram2"]);
+  return runCmd("systemctl", ["--user", "start", "tangram"]);
 }
 
 export async function stopService(): Promise<CmdResult> {
-  return runCmd("systemctl", ["--user", "stop", "tangram2"]);
+  return runCmd("systemctl", ["--user", "stop", "tangram"]);
 }
 
 export async function restartService(): Promise<CmdResult> {
-  return runCmd("systemctl", ["--user", "restart", "tangram2"]);
+  return runCmd("systemctl", ["--user", "restart", "tangram"]);
 }
 
 export async function statusService(): Promise<CmdResult> {
-  return runCmd("systemctl", ["--user", "status", "tangram2", "--no-pager", "--lines", "20"]);
+  return runCmd("systemctl", ["--user", "status", "tangram", "--no-pager", "--lines", "20"]);
 }
 
 export async function ensureAndStartService(): Promise<{ serviceFile: string }> {

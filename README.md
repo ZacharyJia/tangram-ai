@@ -60,7 +60,7 @@ npm run rollback -- --to v0.0.1
 ```
 
 Notes:
-- `upgrade` uses global npm install (`npm install -g tangram2@...`) and auto-restarts service
+- `upgrade` uses global npm install (`npm install -g tangram-ai@...`) and auto-restarts service
 - use `--no-restart` to skip restart
 - if `systemd --user` is unavailable, run foreground mode: `npm run gateway -- --verbose`
 
