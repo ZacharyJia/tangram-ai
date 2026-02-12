@@ -80,10 +80,9 @@ This repo includes a baseline release pipeline:
 
 ### One-time setup for npm CI publish
 
-1. Create npm automation token (npm account settings)
-2. Add GitHub Actions secret in this repo:
-   - name: `NPM_TOKEN`
-   - value: your npm automation token
+1. Configure npm Trusted Publishing for this GitHub repository
+2. Ensure workflow permission includes `id-token: write` (already configured)
+3. No `NPM_TOKEN` secret is required
 
 After this setup, pushing a version tag (for example `v0.0.2`) will publish `tangram-ai` to npm automatically.
 
