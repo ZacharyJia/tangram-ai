@@ -33,6 +33,44 @@ npm run dev -- gateway --verbose
 npm run dev -- onboard
 ```
 
+## Release Workflow
+
+This repo includes a baseline release pipeline:
+
+- CI workflow: `.github/workflows/ci.yml`
+  - runs on push/PR
+  - executes `npm ci`, `npm run lint`, `npm test`, `npm run build`
+- Release workflow: `.github/workflows/release.yml`
+  - triggers on tag push `v*`
+  - builds project and uploads tarball asset to GitHub Release
+
+### Local release commands
+
+- Bump version only:
+
+```bash
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
+
+- Prepare a full release (bump version + build + commit + tag):
+
+```bash
+npm run release:prepare:patch
+npm run release:prepare:minor
+npm run release:prepare:major
+```
+
+After `release:prepare:*` completes, push branch and tag:
+
+```bash
+git push origin master
+git push origin vX.Y.Z
+```
+
+Pushing the tag triggers GitHub Actions release creation automatically.
+
 ## Onboard Wizard
 
 Run `npm run dev -- onboard` for an interactive setup that:
