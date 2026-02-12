@@ -190,7 +190,7 @@ export async function startTelegramGateway(
     );
   };
 
-  const registerCommandsWithRetry = async (): Promise<void> => {
+  const registerCommandsWithRetry = async (): Promise<boolean> => {
     logger?.info("Telegram bot command registration started", {
       scopes: ["default", "all_private_chats"],
       commandCount: TELEGRAM_COMMANDS.length,
@@ -213,7 +213,7 @@ export async function startTelegramGateway(
           commandCount: TELEGRAM_COMMANDS.length,
           attempt,
         });
-        return;
+        return true;
       } catch (err) {
         const info = describeError(err);
         const message = info.message;
@@ -225,7 +225,7 @@ export async function startTelegramGateway(
             message,
             error: info.details,
           });
-          return;
+          return false;
         }
 
         logger?.warn("Telegram bot command registration failed, retrying", {
@@ -239,6 +239,8 @@ export async function startTelegramGateway(
         backoffMs = Math.min(backoffMs * 2, 10000);
       }
     }
+
+    return false;
   };
 
   bot.start(async (ctx) => {
@@ -463,6 +465,11 @@ export async function startTelegramGateway(
     }
   });
 
+  const commandsRegistered = await registerCommandsWithRetry();
+  logger?.info("Telegram bot command registration completed", {
+    success: commandsRegistered,
+  });
+
   let backoffMs = TELEGRAM_LAUNCH_INITIAL_BACKOFF_MS;
   let launched = false;
   for (let attempt = 1; attempt <= TELEGRAM_LAUNCH_MAX_ATTEMPTS; attempt += 1) {
@@ -539,8 +546,6 @@ export async function startTelegramGateway(
   if (!launched) {
     throw new Error("Telegram bot launch failed: exhausted retries");
   }
-
-  void registerCommandsWithRetry();
 
   let stopped = false;
   const stop = () => {
