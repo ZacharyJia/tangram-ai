@@ -37,6 +37,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 
 export type TelegramPush = {
   sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
+  stop: () => void;
 };
 
 function createTypingLoop(ctx: any, chatId: string) {
@@ -306,10 +307,13 @@ export async function startTelegramGateway(
     throw new Error("Telegram bot launch failed: exhausted retries");
   }
 
-  // Graceful shutdown.
-  const stop = () => bot.stop("SIGTERM");
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    bot.stop("SIGTERM");
+    logger?.info("Telegram bot stopped");
+  };
 
-  return { sendToThread };
+  return { sendToThread, stop };
 }
