@@ -28,10 +28,41 @@ Supported providers:
 3) Run
 
 ```bash
-npm run dev -- gateway
-npm run dev -- gateway --verbose
-npm run dev -- onboard
+npm run gateway -- --verbose
+npm run onboard
+npm run gateway -- status
 ```
+
+## Deploy & Upgrade
+
+Deployment bootstrap is part of `onboard`.
+
+```bash
+npm run onboard
+```
+
+During onboarding, the wizard can optionally install/start a user-level `systemd` service.
+
+Gateway service operations:
+
+```bash
+npm run gateway -- status
+npm run gateway -- stop
+npm run gateway -- restart
+```
+
+Upgrade and rollback:
+
+```bash
+npm run upgrade -- --dry-run
+npm run upgrade -- --version v0.0.1
+npm run rollback -- --to v0.0.1
+```
+
+Notes:
+- `upgrade` uses global npm install (`npm install -g tangram-ai@...`) and auto-restarts service
+- use `--no-restart` to skip restart
+- if `systemd --user` is unavailable, run foreground mode: `npm run gateway -- --verbose`
 
 ## Release Workflow
 
@@ -73,10 +104,12 @@ Pushing the tag triggers GitHub Actions release creation automatically.
 
 ## Onboard Wizard
 
-Run `npm run dev -- onboard` for an interactive setup that:
+Run `npm run onboard` for an interactive setup that:
 - asks for provider/API/Telegram settings
 - applies developer-default permissions (shell enabled but restricted)
 - initializes `~/.tangram2` directories and baseline files
+- initializes runtime directories under `~/.tangram2/app`
+- can install/start user-level `systemd` service
 - handles existing files one by one (`overwrite` / `skip` / `backup then overwrite`)
 
 ## Memory (Shared)

@@ -38,12 +38,12 @@ jobs:
 
       - name: Pack artifact
         run: |
-          tar -czf tangram2-${RELEASE_TAG}.tar.gz dist package.json package-lock.json README.md
+          tar -czf tangram-ai-${RELEASE_TAG}.tar.gz dist package.json package-lock.json README.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            tangram2-${{ env.RELEASE_TAG }}.tar.gz
+            tangram-ai-${{ env.RELEASE_TAG }}.tar.gz
           generate_release_notes: true
