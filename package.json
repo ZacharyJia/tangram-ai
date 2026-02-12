@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "bin": {
-    "tangram": "dist/index.js"
+    "tangram": "./dist/index.js"
   },
   "publishConfig": {
     "access": "public"
