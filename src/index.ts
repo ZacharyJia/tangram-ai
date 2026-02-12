@@ -338,7 +338,14 @@ async function runGatewayLoop(): Promise<void> {
   process.once("beforeExit", shutdown);
 
   if (config.channels.telegram?.enabled) {
-    telegramSender = await startTelegramGateway(config, invoke, memory, logger);
+    telegramSender = await startTelegramGateway(
+      config,
+      invoke,
+      memory,
+      sessionStore,
+      () => skillsRuntime.getSnapshot().skills,
+      logger
+    );
     logger.info("Telegram sender ready for cron replies");
     return;
   }

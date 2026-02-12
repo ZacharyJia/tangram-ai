@@ -5,8 +5,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { AppConfig } from "../config/schema.js";
 import { splitTelegramMessage } from "../utils/telegram.js";
 import { withKeyLock } from "../session/locks.js";
+import type { SessionStore } from "../session/store.js";
 import type { MemoryStore } from "../memory/store.js";
 import type { Logger } from "../utils/logger.js";
+import type { SkillSummary } from "../skills/catalog.js";
 
 type InvokeFn = (params: {
   threadId: string;
@@ -79,6 +81,8 @@ export async function startTelegramGateway(
   config: AppConfig,
   invoke: InvokeFn,
   memory: MemoryStore,
+  sessionStore: SessionStore | undefined,
+  getSkills: () => SkillSummary[],
   logger?: Logger
 ): Promise<TelegramPush> {
   const tg = config.channels.telegram;
@@ -203,6 +207,71 @@ export async function startTelegramGateway(
     await replyText(ctx, "Saved to long-term memory.");
   });
 
+  bot.command("new", async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? "");
+    const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
+
+    logger?.debug("Command /new", { chatId, userId });
+    if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
+      if (!userId || !tg.allowFrom.includes(userId)) {
+        await replyText(ctx, "Not allowed.");
+        return;
+      }
+    }
+
+    if (!chatId) {
+      await replyText(ctx, "Cannot resolve current chat id.");
+      return;
+    }
+
+    if (!sessionStore) {
+      await replyText(ctx, "Session persistence is disabled. No stored context to reset.");
+      return;
+    }
+
+    await sessionStore.resetThread(chatId);
+    await replyText(ctx, "Started a new session for this chat.");
+  });
+
+  bot.command("whoami", async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? "");
+    const user = ctx.from;
+    const lines = [
+      "Current Telegram identity:",
+      `- userId: ${user?.id != null ? String(user.id) : "(unknown)"}`,
+      `- username: ${user?.username ? `@${user.username}` : "(none)"}`,
+      `- firstName: ${user?.first_name ?? "(none)"}`,
+      `- lastName: ${user?.last_name ?? "(none)"}`,
+      `- languageCode: ${(user as any)?.language_code ?? "(none)"}`,
+      `- chatId: ${chatId || "(unknown)"}`,
+      `- chatType: ${(ctx.chat as any)?.type ?? "(unknown)"}`,
+    ];
+    await replyText(ctx, lines.join("\n"));
+  });
+
+  bot.command("skill", async (ctx) => {
+    const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
+
+    if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
+      if (!userId || !tg.allowFrom.includes(userId)) {
+        await replyText(ctx, "Not allowed.");
+        return;
+      }
+    }
+
+    const skills = getSkills();
+    if (!skills.length) {
+      await replyText(ctx, "No skills installed.");
+      return;
+    }
+
+    const lines = [
+      `Installed skills (${skills.length}):`,
+      ...skills.map((skill) => `- ${skill.name}: ${skill.description}`),
+    ];
+    await replyText(ctx, lines.join("\n"));
+  });
+
   bot.on("text", async (ctx) => {
     const chatId = String(ctx.chat.id);
     lastSeenChatId = chatId;
@@ -304,6 +373,22 @@ export async function startTelegramGateway(
 
   if (!launched) {
     throw new Error("Telegram bot launch failed: exhausted retries");
+  }
+
+  try {
+    await bot.telegram.setMyCommands([
+      { command: "new", description: "Start a new session" },
+      { command: "whoami", description: "Show your Telegram identity" },
+      { command: "skill", description: "List installed skills" },
+      { command: "memory", description: "Show current memory context" },
+      { command: "remember", description: "Save note to today's memory" },
+      { command: "remember_long", description: "Save note to long-term memory" },
+    ]);
+    logger?.info("Telegram bot commands registered");
+  } catch (err) {
+    logger?.warn("Telegram bot command registration failed", {
+      message: (err as Error)?.message,
+    });
   }
 
   // Graceful shutdown.

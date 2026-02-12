@@ -83,6 +83,18 @@ export class SessionStore {
     await this.append(threadId, "assistant", content);
   }
 
+  async resetThread(threadId: string): Promise<void> {
+    const fp = this.getFilePath(threadId);
+    await withKeyLock(this.getLockKey(threadId), async () => {
+      try {
+        await fs.rm(fp, { force: true });
+      } catch (err) {
+        if ((err as any)?.code === "ENOENT") return;
+        throw err;
+      }
+    });
+  }
+
   async loadRecentMessages(threadId: string, limit: number): Promise<BaseMessage[]> {
     const fp = this.getFilePath(threadId);
     let raw: string;
