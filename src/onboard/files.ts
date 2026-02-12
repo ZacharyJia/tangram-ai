@@ -22,7 +22,7 @@ export type OnboardPaths = {
 };
 
 export function getDefaultOnboardPaths(): OnboardPaths {
-  const baseDir = path.join(os.homedir(), ".tangram2");
+  const baseDir = path.join(os.homedir(), ".tangram-ai");
   const appDir = path.join(baseDir, "app");
   const workspaceDir = path.join(baseDir, "workspace");
   const skillsDir = path.join(baseDir, "skills");

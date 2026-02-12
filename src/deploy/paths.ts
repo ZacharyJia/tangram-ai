@@ -12,7 +12,7 @@ export type AppPaths = {
 
 export function getAppPaths(): AppPaths {
   const home = os.homedir();
-  const baseDir = path.join(home, ".tangram2");
+  const baseDir = path.join(home, ".tangram-ai");
   const appDir = path.join(baseDir, "app");
   const systemdUserDir = path.join(home, ".config", "systemd", "user");
 

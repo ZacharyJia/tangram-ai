@@ -50,7 +50,7 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
   const rl = createInterface({ input, output });
   try {
     // eslint-disable-next-line no-console
-    console.log("\nTangram2 onboard wizard\n");
+    console.log("\nTangram AI onboard wizard\n");
 
     const providerTypeRaw = (
       await rl.question("Provider type (openai/anthropic) [openai]: ")
@@ -92,7 +92,7 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
       : false;
 
     const installSystemdService = toBool(
-      await rl.question("Install user-level systemd service for tangram2? (Y/n): "),
+      await rl.question("Install user-level systemd service for tangram? (Y/n): "),
       true
     );
     const startSystemdService = installSystemdService

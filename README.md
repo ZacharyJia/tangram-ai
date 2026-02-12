@@ -1,4 +1,4 @@
-# tangram2 (MVP)
+# Tangram AI (MVP)
 
 Minimal Telegram chatbot built with **TypeScript + LangGraph**, with **multi-provider config** and **OpenAI Responses API** as the default provider.
 
@@ -13,10 +13,10 @@ npm i
 2) Create config
 
 ```bash
-mkdir -p ~/.tangram2 && cp config.example.json ~/.tangram2/config.json
+mkdir -p ~/.tangram-ai && cp config.example.json ~/.tangram-ai/config.json
 ```
 
-Edit `~/.tangram2/config.json` and set:
+Edit `~/.tangram-ai/config.json` and set:
 - `channels.telegram.token`
 - `providers.<yourProviderKey>.apiKey`
 - optionally `providers.<yourProviderKey>.baseUrl`
@@ -118,14 +118,14 @@ Pushing the tag triggers GitHub Actions release creation automatically.
 Run `npm run onboard` for an interactive setup that:
 - asks for provider/API/Telegram settings
 - applies developer-default permissions (shell enabled but restricted)
-- initializes `~/.tangram2` directories and baseline files
-- initializes runtime directories under `~/.tangram2/app`
+- initializes `~/.tangram-ai` directories and baseline files
+- initializes runtime directories under `~/.tangram-ai/app`
 - can install/start user-level `systemd` service
 - handles existing files one by one (`overwrite` / `skip` / `backup then overwrite`)
 
 ## Memory (Shared)
 
-Shared memory lives under the configured workspace directory (default: `~/.tangram2/workspace`):
+Shared memory lives under the configured workspace directory (default: `~/.tangram-ai/workspace`):
 - Long-term memory: `memory/memory.md`
 - Daily notes: `memory/YYYY-MM-DD.md`
 
@@ -158,7 +158,7 @@ The LangGraph workflow also runs a post-reply "memory reflection" node that can 
 The runtime discovers local skills and injects a compact skills list into the model instructions, so the model can decide which skill to open/use.
 
 By default it scans:
-- `~/.tangram2/skills`
+- `~/.tangram-ai/skills`
 
 You can customize via `agents.defaults.skills`:
 
@@ -169,7 +169,7 @@ You can customize via `agents.defaults.skills`:
       "skills": {
         "enabled": true,
         "roots": [
-          "~/.tangram2/skills"
+          "~/.tangram-ai/skills"
         ],
         "maxSkills": 40,
         "hotReload": {
@@ -202,8 +202,8 @@ Enable shell execution only when needed:
       "shell": {
         "enabled": true,
         "fullAccess": false,
-        "roots": ["~/.tangram2"],
-        "defaultCwd": "~/.tangram2/workspace",
+        "roots": ["~/.tangram-ai"],
+        "defaultCwd": "~/.tangram-ai/workspace",
         "timeoutMs": 120000,
         "maxOutputChars": 12000
       }
@@ -227,7 +227,7 @@ Heartbeat periodically reads `HEARTBEAT.md` and triggers a model run with that c
       "heartbeat": {
         "enabled": true,
         "intervalSeconds": 300,
-        "filePath": "~/.tangram2/workspace/HEARTBEAT.md",
+        "filePath": "~/.tangram-ai/workspace/HEARTBEAT.md",
         "threadId": "heartbeat"
       }
     }
@@ -246,7 +246,7 @@ Cron scheduler runs due tasks and sends their payload to the model at the schedu
       "cron": {
         "enabled": true,
         "tickSeconds": 15,
-        "storePath": "~/.tangram2/workspace/cron-tasks.json",
+        "storePath": "~/.tangram-ai/workspace/cron-tasks.json",
         "defaultThreadId": "cron"
       }
     }
@@ -308,6 +308,8 @@ This project supports **multiple provider instances**. Example:
 
 Config lookup order:
 - `--config <path>`
-- `TANGRAM2_CONFIG`
-- `~/.tangram2/config.json`
+- `TANGRAM_AI_CONFIG` (preferred)
+- `TANGRAM2_CONFIG` (legacy compatibility)
+- `~/.tangram-ai/config.json` (preferred)
+- `~/.tangram2/config.json` (legacy compatibility)
 - `./config.json` (legacy fallback)
