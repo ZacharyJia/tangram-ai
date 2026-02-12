@@ -49,9 +49,9 @@ export async function runOnboard(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(`- ${serviceMessage}`);
     // eslint-disable-next-line no-console
-    console.log("- Check: npm run gateway -- status");
+    console.log("- Check: tangram gateway status");
   } else {
     // eslint-disable-next-line no-console
-    console.log("- Run: npm run dev -- gateway --verbose");
+    console.log("- Run: tangram gateway --verbose");
   }
 }

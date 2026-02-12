@@ -55,11 +55,11 @@ function usage(exitCode = 0) {
   console.log(
     [
       "Usage:",
-      "  npm run gateway -- [--config <path>] [--verbose|-v]",
-      "  npm run gateway -- status|stop|restart",
-      "  npm run onboard",
-      "  npm run upgrade -- [--version <tag>] [--no-restart] [--dry-run]",
-      "  npm run rollback -- [--to <tag>] [--no-restart]",
+      "  tangram gateway [--config <path>] [--verbose|-v]",
+      "  tangram gateway status|stop|restart",
+      "  tangram onboard",
+      "  tangram upgrade [--version <tag>] [--no-restart] [--dry-run]",
+      "  tangram rollback [--to <tag>] [--no-restart]",
       "",
       "Config lookup order:",
       "  1) --config <path>",
@@ -85,7 +85,7 @@ async function runGatewayServiceCommand(action: "status" | "stop" | "restart"): 
   }
   if (result.code !== 0) {
     throw new Error(
-      `gateway ${action} failed. If systemd --user is unavailable, use foreground mode: npm run gateway -- --verbose`
+      `gateway ${action} failed. If systemd --user is unavailable, use foreground mode: tangram gateway --verbose`
     );
   }
 }
