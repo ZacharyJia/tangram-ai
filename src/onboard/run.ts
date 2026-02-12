@@ -6,6 +6,7 @@ import {
   buildHeartbeatTemplate,
   buildSkillsReadmeTemplate,
 } from "./templates.js";
+import { installService } from "../deploy/systemdUser.js";
 
 export async function runOnboard(): Promise<void> {
   const answers = await runOnboardPrompts();
@@ -22,6 +23,14 @@ export async function runOnboard(): Promise<void> {
 
   const results = await writeOnboardFiles(files);
 
+  let serviceMessage: string | undefined;
+  if (answers.installSystemdService) {
+    const result = await installService({ start: answers.startSystemdService });
+    serviceMessage = result.started
+      ? `systemd service installed and started (${result.serviceFile})`
+      : `systemd service installed (${result.serviceFile}), not started`;
+  }
+
   // eslint-disable-next-line no-console
   console.log("\nOnboard completed.\n");
   for (const r of results) {
@@ -36,7 +45,13 @@ export async function runOnboard(): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log("\nNext steps:");
-  // eslint-disable-next-line no-console
-  console.log("- Run: npm run dev -- gateway --verbose");
+  if (serviceMessage) {
+    // eslint-disable-next-line no-console
+    console.log(`- ${serviceMessage}`);
+    // eslint-disable-next-line no-console
+    console.log("- Check: npm run gateway -- status");
+  } else {
+    // eslint-disable-next-line no-console
+    console.log("- Run: npm run dev -- gateway --verbose");
+  }
 }
-

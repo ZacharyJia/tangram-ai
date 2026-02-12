@@ -12,6 +12,8 @@ export type OnboardAnswers = {
   telegramAllowFrom: string[];
   shellEnabled: boolean;
   shellFullAccess: boolean;
+  installSystemdService: boolean;
+  startSystemdService: boolean;
   overwritePolicyDefault: "ask";
 };
 
@@ -89,6 +91,17 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
         )
       : false;
 
+    const installSystemdService = toBool(
+      await rl.question("Install user-level systemd service for tangram2? (Y/n): "),
+      true
+    );
+    const startSystemdService = installSystemdService
+      ? toBool(
+          await rl.question("Start service now after install? (Y/n): "),
+          true
+        )
+      : false;
+
     return {
       providerType,
       providerKey,
@@ -100,10 +113,11 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
       telegramAllowFrom,
       shellEnabled,
       shellFullAccess,
+      installSystemdService,
+      startSystemdService,
       overwritePolicyDefault: "ask",
     };
   } finally {
     rl.close();
   }
 }
-
