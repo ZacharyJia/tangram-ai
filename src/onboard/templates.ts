@@ -48,6 +48,12 @@ export function buildConfigJson(answers: OnboardAnswers): string {
           storePath: "~/.tangram/workspace/cron-tasks.json",
           defaultThreadId: "cron",
         },
+        session: {
+          enabled: true,
+          dir: "~/.tangram/workspace/sessions",
+          restoreMessages: 100,
+          persistAssistantEmpty: false,
+        },
         temperature: 0.7,
         systemPrompt: "You are a helpful assistant. Keep replies concise.",
       },

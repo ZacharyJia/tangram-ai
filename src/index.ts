@@ -2,7 +2,7 @@
 
 import "dotenv/config";
 
-import { HumanMessage } from "@langchain/core/messages";
+import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 
 import { loadConfig } from "./config/load.js";
 import { createLlmClient, getProvider } from "./providers/registry.js";
@@ -17,6 +17,7 @@ import { HeartbeatRunner } from "./scheduler/heartbeat.js";
 import { runOnboard } from "./onboard/run.js";
 import { restartService, statusService, stopService } from "./deploy/systemdUser.js";
 import { runRollback, runUpgrade } from "./deploy/upgrade.js";
+import { SessionStore } from "./session/store.js";
 
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
@@ -170,6 +171,17 @@ async function runGatewayLoop(): Promise<void> {
   const memory = new MemoryStore(config.agents.defaults.workspace);
   await memory.init();
 
+  const sessionCfg = config.agents.defaults.session;
+  const sessionStore = sessionCfg?.enabled ? new SessionStore(sessionCfg.dir, logger) : undefined;
+  if (sessionStore) {
+    await sessionStore.init();
+    logger.info("Session store ready", {
+      dir: sessionStore.dir,
+      restoreMessages: sessionCfg.restoreMessages,
+      persistAssistantEmpty: sessionCfg.persistAssistantEmpty,
+    });
+  }
+
   const cronCfg = config.agents.defaults.cron;
   const cronStore = new CronStore(cronCfg.storePath);
   await cronStore.init();
@@ -204,23 +216,59 @@ async function runGatewayLoop(): Promise<void> {
     text: string;
     onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
   }) => {
+    let history: BaseMessage[] = [];
+    if (sessionStore) {
+      try {
+        history = await sessionStore.loadRecentMessages(threadId, sessionCfg.restoreMessages);
+      } catch (err) {
+        logger.warn("Session restore failed", {
+          threadId,
+          message: (err as Error)?.message,
+        });
+      }
+    }
+
     const res = await graph.invoke(
       {
-        messages: [new HumanMessage(text)],
+        messages: [...history, new HumanMessage(text)],
       },
       {
         configurable: { thread_id: threadId, on_progress: onProgress },
       }
     );
 
+    let rawReply = "";
     const lastReply = (res as any).lastReply as string | undefined;
-    if (lastReply) return lastReply;
+    if (typeof lastReply === "string" && lastReply.length > 0) {
+      rawReply = lastReply;
+    } else {
+      const msgs = (res as any).messages as any[] | undefined;
+      const last = Array.isArray(msgs) ? msgs[msgs.length - 1] : undefined;
+      const content = last?.content;
+      if (typeof content === "string" && content.length > 0) {
+        rawReply = content;
+      }
+    }
 
-    const msgs = (res as any).messages as any[] | undefined;
-    const last = Array.isArray(msgs) ? msgs[msgs.length - 1] : undefined;
-    const content = last?.content;
-    if (typeof content === "string" && content.length > 0) return content;
-    return "(empty reply)";
+    const finalReply = rawReply || "(empty reply)";
+
+    if (sessionStore) {
+      try {
+        await sessionStore.appendUserMessage(threadId, text);
+
+        const assistantText = rawReply || (sessionCfg.persistAssistantEmpty ? finalReply : "");
+        if (assistantText) {
+          await sessionStore.appendAssistantMessage(threadId, assistantText);
+        }
+      } catch (err) {
+        logger.warn("Session persist failed", {
+          threadId,
+          message: (err as Error)?.message,
+        });
+      }
+    }
+
+    return finalReply;
   };
 
   const heartbeatRunner = new HeartbeatRunner({
