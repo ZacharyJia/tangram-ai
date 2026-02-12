@@ -19,10 +19,10 @@ async function fileExists(p: string): Promise<boolean> {
 }
 
 export async function resolveConfigPath(explicitPath?: string): Promise<string> {
-  const homeConfig = path.join(os.homedir(), ".tangram-ai", "config.json");
+  const homeConfig = path.join(os.homedir(), ".tangram", "config.json");
   const candidates: Array<string | undefined> = [
     explicitPath,
-    process.env.TANGRAM_AI_CONFIG,
+    process.env.TANGRAM_CONFIG,
     homeConfig,
     // Optional local fallback for local-dev setups.
     path.resolve(process.cwd(), "config.json"),
@@ -48,8 +48,8 @@ export async function loadConfig(explicitPath?: string): Promise<LoadedConfig> {
         [
           `Config file not found: ${configPath}`,
           "Create one from config.example.json:",
-          "  mkdir -p ~/.tangram-ai && cp config.example.json ~/.tangram-ai/config.json",
-          "Or set TANGRAM_AI_CONFIG to an absolute path.",
+          "  mkdir -p ~/.tangram && cp config.example.json ~/.tangram/config.json",
+          "Or set TANGRAM_CONFIG to an absolute path.",
         ].join("\n")
       );
     }

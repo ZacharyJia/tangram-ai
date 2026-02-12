@@ -75,7 +75,7 @@ function dedupePaths(paths: string[]): string[] {
 }
 
 function getDefaultSkillRoots(): string[] {
-  return [path.join(os.homedir(), ".tangram-ai", "skills")];
+  return [path.join(os.homedir(), ".tangram", "skills")];
 }
 
 export function resolveSkillRoots(config: AppConfig): string[] {

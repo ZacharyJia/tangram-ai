@@ -17,10 +17,10 @@ export function buildConfigJson(answers: OnboardAnswers): string {
     agents: {
       defaults: {
         provider: answers.providerKey,
-        workspace: "~/.tangram-ai/workspace",
+        workspace: "~/.tangram/workspace",
         skills: {
           enabled: true,
-          roots: ["~/.tangram-ai/skills"],
+          roots: ["~/.tangram/skills"],
           maxSkills: 40,
           hotReload: {
             enabled: true,
@@ -31,21 +31,21 @@ export function buildConfigJson(answers: OnboardAnswers): string {
         shell: {
           enabled: answers.shellEnabled,
           fullAccess: answers.shellFullAccess,
-          roots: ["~/.tangram-ai"],
-          defaultCwd: "~/.tangram-ai/workspace",
+          roots: ["~/.tangram"],
+          defaultCwd: "~/.tangram/workspace",
           timeoutMs: 120000,
           maxOutputChars: 12000,
         },
         heartbeat: {
           enabled: false,
           intervalSeconds: 300,
-          filePath: "~/.tangram-ai/workspace/HEARTBEAT.md",
+          filePath: "~/.tangram/workspace/HEARTBEAT.md",
           threadId: "heartbeat",
         },
         cron: {
           enabled: true,
           tickSeconds: 15,
-          storePath: "~/.tangram-ai/workspace/cron-tasks.json",
+          storePath: "~/.tangram/workspace/cron-tasks.json",
           defaultThreadId: "cron",
         },
         temperature: 0.7,
@@ -94,11 +94,11 @@ export function buildCronStoreTemplate(): string {
 
 export function buildSkillsReadmeTemplate(): string {
   return [
-    "# Tangram AI Skills",
+    "# Tangram Skills",
     "",
     "Place each skill in its own folder:",
     "",
-    "- ~/.tangram-ai/skills/<skill-name>/SKILL.md",
+    "- ~/.tangram/skills/<skill-name>/SKILL.md",
     "",
     "The runtime discovers these folders and injects skill metadata into prompts.",
   ].join("\n");

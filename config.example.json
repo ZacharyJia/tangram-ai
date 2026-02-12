@@ -16,11 +16,11 @@
   "agents": {
     "defaults": {
       "provider": "openai",
-      "workspace": "~/.tangram-ai/workspace",
+      "workspace": "~/.tangram/workspace",
       "skills": {
         "enabled": true,
         "roots": [
-          "~/.tangram-ai/skills"
+          "~/.tangram/skills"
         ],
         "maxSkills": 40,
         "hotReload": {
@@ -33,22 +33,22 @@
         "enabled": false,
         "fullAccess": false,
         "roots": [
-          "~/.tangram-ai"
+          "~/.tangram"
         ],
-        "defaultCwd": "~/.tangram-ai/workspace",
+        "defaultCwd": "~/.tangram/workspace",
         "timeoutMs": 120000,
         "maxOutputChars": 12000
       },
       "heartbeat": {
         "enabled": false,
         "intervalSeconds": 300,
-        "filePath": "~/.tangram-ai/workspace/HEARTBEAT.md",
+        "filePath": "~/.tangram/workspace/HEARTBEAT.md",
         "threadId": "heartbeat"
       },
       "cron": {
         "enabled": true,
         "tickSeconds": 15,
-        "storePath": "~/.tangram-ai/workspace/cron-tasks.json",
+        "storePath": "~/.tangram/workspace/cron-tasks.json",
         "defaultThreadId": "cron"
       },
       "temperature": 0.7,

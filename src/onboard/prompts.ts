@@ -50,7 +50,7 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
   const rl = createInterface({ input, output });
   try {
     // eslint-disable-next-line no-console
-    console.log("\nTangram AI onboard wizard\n");
+    console.log("\nTangram onboard wizard\n");
 
     const providerTypeRaw = (
       await rl.question("Provider type (openai/anthropic) [openai]: ")
