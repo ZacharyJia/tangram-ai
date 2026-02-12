@@ -51,7 +51,7 @@ export async function ensureServiceFile(options?: { description?: string }): Pro
   const paths = getAppPaths();
   await fs.mkdir(paths.systemdUserDir, { recursive: true });
 
-  const description = options?.description ?? "Tangram2 Gateway";
+  const description = options?.description ?? "Tangram Gateway";
   const npmBin = resolveUserNpmBin();
   const unit = [
     "[Unit]",

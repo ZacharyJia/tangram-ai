@@ -336,8 +336,8 @@ export function createAgentGraph(
             {
               enabled: Boolean(shellCfg?.enabled),
               fullAccess: Boolean(shellCfg?.fullAccess),
-              roots: shellCfg?.roots ?? ["~/.tangram2"],
-              defaultCwd: shellCfg?.defaultCwd ?? "~/.tangram2/workspace",
+              roots: shellCfg?.roots ?? ["~/.tangram"],
+              defaultCwd: shellCfg?.defaultCwd ?? "~/.tangram/workspace",
               timeoutMs: shellCfg?.timeoutMs ?? 120000,
               maxOutputChars: shellCfg?.maxOutputChars ?? 12000,
             }
@@ -401,7 +401,7 @@ export function createAgentGraph(
       if (!userText && !assistantText) return {};
 
       const reflectionPrompt = [
-        "You are tangram2's memory writer.",
+        "You are Tangram's memory writer.",
         "<system-reminder>",
         "- Summarize useful info from this turn into shared memory.",
         "- Store stable facts, preferences, ongoing projects, decisions, TODOs.",

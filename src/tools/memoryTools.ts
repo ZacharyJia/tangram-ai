@@ -28,7 +28,7 @@ export const memoryToolDefs: FunctionToolDef[] = [
   {
     name: "memory_write",
     description:
-      "Write shared memory for tangram2. Use scope='daily' for today's notes or scope='long_term' for durable preferences/decisions. Do not store secrets.",
+      "Write shared memory for Tangram. Use scope='daily' for today's notes or scope='long_term' for durable preferences/decisions. Do not store secrets.",
     strict: true,
     parameters: {
       type: "object",

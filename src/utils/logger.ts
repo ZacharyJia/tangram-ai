@@ -17,7 +17,7 @@ function safeStringify(meta: unknown): string {
 function print(level: "DEBUG" | "INFO" | "WARN" | "ERROR", message: string, meta?: unknown) {
   const ts = new Date().toISOString();
   const suffix = meta === undefined ? "" : ` ${safeStringify(meta)}`;
-  const line = `[${ts}] [tangram2] [${level}] ${message}${suffix}`;
+  const line = `[${ts}] [tangram] [${level}] ${message}${suffix}`;
 
   if (level === "ERROR") {
     // eslint-disable-next-line no-console
@@ -53,4 +53,3 @@ export function createLogger(verbose: boolean): Logger {
     },
   };
 }
-

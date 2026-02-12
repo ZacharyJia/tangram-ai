@@ -63,9 +63,9 @@ function usage(exitCode = 0) {
       "",
       "Config lookup order:",
       "  1) --config <path>",
-      "  2) $TANGRAM2_CONFIG",
-      "  3) ~/.tangram2/config.json",
-      "  4) ./config.json (legacy fallback)",
+      "  2) $TANGRAM_CONFIG",
+      "  3) ~/.tangram/config.json",
+      "  4) ./config.json (local fallback)",
     ].join("\n")
   );
   process.exit(exitCode);
@@ -209,7 +209,7 @@ async function runGatewayLoop(): Promise<void> {
   const heartbeatRunner = new HeartbeatRunner({
     enabled: Boolean(config.agents.defaults.heartbeat?.enabled),
     intervalSeconds: config.agents.defaults.heartbeat?.intervalSeconds ?? 300,
-    filePath: config.agents.defaults.heartbeat?.filePath ?? "~/.tangram2/workspace/HEARTBEAT.md",
+    filePath: config.agents.defaults.heartbeat?.filePath ?? "~/.tangram/workspace/HEARTBEAT.md",
     threadId: config.agents.defaults.heartbeat?.threadId ?? "heartbeat",
     invoke,
     logger,
