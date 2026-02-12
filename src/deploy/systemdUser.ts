@@ -115,7 +115,7 @@ export async function ensureAndStartService(): Promise<{ serviceFile: string }> 
   const hasSystemd = await isSystemdUserAvailable();
   if (!hasSystemd) {
     throw new Error(
-      "systemd --user is not available on this machine. Use foreground mode: npm run gateway -- --verbose"
+      "systemd --user is not available on this machine. Use foreground mode: tangram gateway --verbose"
     );
   }
 
@@ -142,7 +142,7 @@ export async function installService(options?: { start?: boolean }): Promise<{ s
   const hasSystemd = await isSystemdUserAvailable();
   if (!hasSystemd) {
     throw new Error(
-      "systemd --user is not available on this machine. Use foreground mode: npm run gateway -- --verbose"
+      "systemd --user is not available on this machine. Use foreground mode: tangram gateway --verbose"
     );
   }
 
