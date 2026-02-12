@@ -63,6 +63,8 @@ export async function ensureServiceFile(options?: { description?: string }): Pro
     `WorkingDirectory=${paths.baseDir}`,
     `Environment=PATH=${npmBin}:/usr/local/bin:/usr/bin:/bin`,
     `ExecStart=${npmBin}/tangram gateway --config ${paths.configPath}`,
+    "TimeoutStopSec=20",
+    "KillSignal=SIGTERM",
     "Restart=always",
     "RestartSec=3",
     "",
