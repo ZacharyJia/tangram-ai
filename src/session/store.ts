@@ -52,6 +52,10 @@ export class SessionStore {
     return path.join(this.dir, `${encoded}.jsonl`);
   }
 
+  private getLockKey(threadId: string): string {
+    return `session:${threadId}`;
+  }
+
   private async append(threadId: string, role: SessionRole, content: string): Promise<void> {
     const trimmed = content.trim();
     if (!trimmed) return;
@@ -66,7 +70,7 @@ export class SessionStore {
     };
 
     const line = `${JSON.stringify(record)}\n`;
-    await withKeyLock(threadId, async () => {
+    await withKeyLock(this.getLockKey(threadId), async () => {
       await fs.appendFile(fp, line, "utf8");
     });
   }
@@ -118,4 +122,3 @@ export class SessionStore {
     });
   }
 }
-
