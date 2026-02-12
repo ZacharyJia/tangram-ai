@@ -87,6 +87,19 @@ async function installGlobalVersion(target: string): Promise<void> {
   }
 }
 
+async function getLatestRegistryVersion(): Promise<string> {
+  const result = await runCmd("npm", ["view", PACKAGE_NAME, "version"]);
+  if (result.code !== 0) {
+    throw new Error(`npm view failed: ${result.stderr || result.stdout}`);
+  }
+
+  const version = result.stdout.trim();
+  if (!version) {
+    throw new Error(`npm view returned empty version for ${PACKAGE_NAME}`);
+  }
+  return version;
+}
+
 async function tryGetCurrentGlobalVersion(): Promise<string | undefined> {
   const result = await runCmd("npm", ["list", "-g", PACKAGE_NAME, "--depth=0", "--json"]);
   if (result.code !== 0) return undefined;
@@ -116,17 +129,28 @@ export async function runUpgrade(options: UpgradeOptions): Promise<UpgradeResult
   const target = options.version ? normalizeVersion(options.version) : "latest";
   const restart = options.restart ?? true;
   const previousVersion = await tryGetCurrentGlobalVersion();
+  const resolvedTargetVersion = target === "latest" ? await getLatestRegistryVersion() : target;
+  const alreadyLatest = Boolean(previousVersion && previousVersion === resolvedTargetVersion);
 
   if (options.dryRun) {
     return {
-      version: target,
+      version: resolvedTargetVersion,
       previousVersion,
-      changed: true,
+      changed: !alreadyLatest,
       restarted: false,
     };
   }
 
-  await installGlobalVersion(target);
+  if (alreadyLatest) {
+    return {
+      version: resolvedTargetVersion,
+      previousVersion,
+      changed: false,
+      restarted: false,
+    };
+  }
+
+  await installGlobalVersion(resolvedTargetVersion);
   const installed = await tryGetCurrentGlobalVersion();
   if (!installed) {
     throw new Error(`Cannot determine installed ${PACKAGE_NAME} version after upgrade.`);

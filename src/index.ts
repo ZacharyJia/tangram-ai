@@ -112,6 +112,12 @@ async function runUpgradeCommand(): Promise<void> {
     restart: !noRestart,
   });
 
+  if (!result.changed) {
+    // eslint-disable-next-line no-console
+    console.log(`Already up to date: ${result.version}`);
+    return;
+  }
+
   // eslint-disable-next-line no-console
   console.log(
     [
