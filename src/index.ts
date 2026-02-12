@@ -162,6 +162,14 @@ async function runGatewayLoop(): Promise<void> {
     );
   }
 
+  if (config.agents.defaults.files?.enabled && config.agents.defaults.files?.fullAccess) {
+    // Always print this warning, even when --verbose is disabled.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "\u26a0 SECURITY WARNING files.fullAccess=true: file tools can read/write any local path. Use only in trusted environments."
+    );
+  }
+
   logger.info("Gateway bootstrap", { command: "gateway", verbose: logger.enabled });
 
   const providerKey = config.agents.defaults.provider;

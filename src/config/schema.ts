@@ -67,6 +67,20 @@ export const ConfigSchema = z
                 maxSkills: 40,
                 hotReload: { enabled: true, debounceMs: 800, logDiff: true },
               }),
+            files: z
+              .object({
+                enabled: z.boolean().optional().default(true),
+                // If true, skip path root restrictions and allow any local path.
+                fullAccess: z.boolean().optional().default(false),
+                roots: z.array(z.string().min(1)).optional().default(["~/.tangram"]),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: true,
+                fullAccess: false,
+                roots: ["~/.tangram"],
+              }),
             shell: z
               .object({
                 enabled: z.boolean().optional().default(false),
