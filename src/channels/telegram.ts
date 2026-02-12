@@ -417,12 +417,39 @@ export async function startTelegramGateway(
       maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
     });
     try {
-      await withTimeout(bot.launch(), TELEGRAM_LAUNCH_TIMEOUT_MS, "telegram launch");
+      let launchAcknowledged = false;
+      const launchStart = new Promise<void>((resolve, reject) => {
+        const runtime = bot.launch({}, () => {
+          launchAcknowledged = true;
+          resolve();
+        });
+
+        runtime.catch((err) => {
+          if (launchAcknowledged) {
+            logger?.error("Telegram bot runtime failed", {
+              message: (err as Error)?.message,
+            });
+            return;
+          }
+          reject(err);
+        });
+      });
+
+      await withTimeout(launchStart, TELEGRAM_LAUNCH_TIMEOUT_MS, "telegram launch start");
       logger?.info("Telegram bot launched", { attempt });
       launched = true;
       break;
     } catch (err) {
       const message = (err as Error)?.message ?? "unknown error";
+      if (message.includes("timeout")) {
+        logger?.error("Telegram bot launch timed out; aborting for clean restart", {
+          attempt,
+          maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
+          message,
+        });
+        throw err;
+      }
+
       const finalAttempt = attempt >= TELEGRAM_LAUNCH_MAX_ATTEMPTS;
       if (finalAttempt) {
         logger?.error("Telegram bot launch failed", {
@@ -431,6 +458,11 @@ export async function startTelegramGateway(
           message,
         });
         throw err;
+      }
+
+      try {
+        bot.stop("launch-retry");
+      } catch {
       }
 
       logger?.warn("Telegram bot launch failed, retrying", {
