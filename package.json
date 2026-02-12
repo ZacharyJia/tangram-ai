@@ -6,6 +6,9 @@
   "bin": {
     "tangram": "dist/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/index.ts gateway",
     "build": "tsc -p tsconfig.json",

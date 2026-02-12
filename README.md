@@ -74,6 +74,17 @@ This repo includes a baseline release pipeline:
 - Release workflow: `.github/workflows/release.yml`
   - triggers on tag push `v*`
   - builds project and uploads tarball asset to GitHub Release
+- npm publish workflow: `.github/workflows/npm-publish.yml`
+  - triggers on tag push `v*`
+  - executes `npm ci`, `npm run build`, `npm publish`
+
+### One-time setup for npm CI publish
+
+1. Configure npm Trusted Publishing for this GitHub repository
+2. Ensure workflow permission includes `id-token: write` (already configured)
+3. No `NPM_TOKEN` secret is required
+
+After this setup, pushing a version tag (for example `v0.0.2`) will publish `tangram-ai` to npm automatically.
 
 ### Local release commands
 
