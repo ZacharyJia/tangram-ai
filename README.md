@@ -167,14 +167,15 @@ Config:
 
 The agent exposes function tools to the model (via OpenAI Responses API):
 - `memory_search` search shared memory files
-- `memory_write` append to shared memory files
-- `file_read` read local skill/content files from allowed roots
-- `file_write` write local files under allowed roots
+- `file_read` read local skill/content files
+- `file_write` write local files
 - `file_edit` edit files by targeted text replacement
 - `bash` execute CLI commands when `agents.defaults.shell.enabled=true`
 - `cron_schedule` schedule one-time/repeating callbacks
 - `cron_list` list scheduled callbacks
 - `cron_cancel` cancel scheduled callbacks
+
+Memory writes should be done via `file_write` / `file_edit` directly to memory files in workspace.
 
 The LangGraph workflow also runs a post-reply "memory reflection" node that can automatically summarize the latest turn into memory using a strict JSON format prompt.
 
@@ -214,7 +215,23 @@ Hot reload behavior:
 - updates apply globally to the next LLM execution without restarting gateway
 - when `hotReload.logDiff=true`, gateway logs added/removed/changed skills
 
-`file_read` / `file_write` / `file_edit` are path-restricted to these resolved skill roots.
+`file_read` / `file_write` / `file_edit` use `agents.defaults.files` config for access control.
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "files": {
+        "enabled": true,
+        "fullAccess": false,
+        "roots": ["~/.tangram"]
+      }
+    }
+  }
+}
+```
+
+Set `files.fullAccess=true` to disable path restrictions and allow file access to any local path.
 
 ## Shell Tool (Optional)
 

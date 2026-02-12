@@ -42,7 +42,7 @@ export const fileToolDefs: FunctionToolDef[] = [
   {
     name: "file_read",
     description:
-      "Read a UTF-8 text file from allowed local directories. Use startLine/maxLines to read partial content.",
+      "Read a UTF-8 text file from local directories. Use startLine/maxLines to read partial content.",
     strict: true,
     parameters: {
       type: "object",
@@ -58,7 +58,7 @@ export const fileToolDefs: FunctionToolDef[] = [
   {
     name: "file_write",
     description:
-      "Write UTF-8 text to an allowed local file. Supports overwrite or append mode. Creates parent directories if missing.",
+      "Write UTF-8 text to a local file. Supports overwrite or append mode. Creates parent directories if missing.",
     strict: true,
     parameters: {
       type: "object",
@@ -154,10 +154,30 @@ function resolveAllowedPath(inputPath: string, roots: string[]): string {
   throw new Error(`Path is outside allowed roots: ${inputPath}`);
 }
 
+function resolveFullAccessPath(inputPath: string, defaultCwd: string): string {
+  if (path.isAbsolute(inputPath)) {
+    return path.resolve(inputPath);
+  }
+  return path.resolve(defaultCwd, inputPath);
+}
+
+function resolveToolPath(
+  inputPath: string,
+  opts: { allowedRoots: string[]; fullAccess: boolean; defaultCwd: string }
+): string {
+  if (opts.fullAccess) {
+    return resolveFullAccessPath(inputPath, opts.defaultCwd);
+  }
+  return resolveAllowedPath(inputPath, opts.allowedRoots);
+}
+
 export async function executeFileTool(
   call: FunctionToolCall,
-  opts: { allowedRoots: string[] }
+  opts: { allowedRoots: string[]; fullAccess?: boolean; defaultCwd?: string }
 ): Promise<string> {
+  const fullAccess = Boolean(opts.fullAccess);
+  const defaultCwd = path.resolve(opts.defaultCwd ?? process.cwd());
+
   if (call.name === "file_read") {
     const parsed = FileReadArgs.safeParse(safeJsonParse(call.argumentsJson));
     if (!parsed.success) {
@@ -167,7 +187,11 @@ export async function executeFileTool(
     const { path: rawPath, startLine, maxLines } = parsed.data;
     let fp: string;
     try {
-      fp = resolveAllowedPath(rawPath, opts.allowedRoots);
+      fp = resolveToolPath(rawPath, {
+        allowedRoots: opts.allowedRoots,
+        fullAccess,
+        defaultCwd,
+      });
     } catch (err) {
       return (err as Error).message;
     }
@@ -201,7 +225,11 @@ export async function executeFileTool(
     const { path: rawPath, content, mode } = parsed.data;
     let fp: string;
     try {
-      fp = resolveAllowedPath(rawPath, opts.allowedRoots);
+      fp = resolveToolPath(rawPath, {
+        allowedRoots: opts.allowedRoots,
+        fullAccess,
+        defaultCwd,
+      });
     } catch (err) {
       return (err as Error).message;
     }
@@ -228,7 +256,11 @@ export async function executeFileTool(
     const { path: rawPath, replacements, createIfMissing } = parsed.data;
     let fp: string;
     try {
-      fp = resolveAllowedPath(rawPath, opts.allowedRoots);
+      fp = resolveToolPath(rawPath, {
+        allowedRoots: opts.allowedRoots,
+        fullAccess,
+        defaultCwd,
+      });
     } catch (err) {
       return (err as Error).message;
     }

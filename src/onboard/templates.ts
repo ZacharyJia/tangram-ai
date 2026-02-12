@@ -28,6 +28,11 @@ export function buildConfigJson(answers: OnboardAnswers): string {
             logDiff: true,
           },
         },
+        files: {
+          enabled: true,
+          fullAccess: answers.shellFullAccess,
+          roots: ["~/.tangram"],
+        },
         shell: {
           enabled: answers.shellEnabled,
           fullAccess: answers.shellFullAccess,

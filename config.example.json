@@ -29,6 +29,13 @@
           "logDiff": true
         }
       },
+      "files": {
+        "enabled": true,
+        "fullAccess": false,
+        "roots": [
+          "~/.tangram"
+        ]
+      },
       "shell": {
         "enabled": false,
         "fullAccess": false,
