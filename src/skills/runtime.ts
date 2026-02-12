@@ -1,4 +1,4 @@
-import { statSync, watch, type FSWatcher } from "node:fs";
+import { readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 
 import type { AppConfig } from "../config/schema.js";
@@ -35,6 +35,15 @@ function isDirectory(dirPath: string): boolean {
     return statSync(dirPath).isDirectory();
   } catch {
     return false;
+  }
+}
+
+function listImmediateSubdirs(dirPath: string): string[] {
+  try {
+    const entries = readdirSync(dirPath, { withFileTypes: true });
+    return entries.filter((e) => e.isDirectory()).map((e) => path.join(dirPath, e.name));
+  } catch {
+    return [];
   }
 }
 
@@ -186,6 +195,14 @@ export class SkillsRuntime {
 
         if (!changed) {
           this.logger?.debug("Skills reload skipped (no changes)", { reason, count: nextSkills.length });
+
+          // Even when the discovered skills list is unchanged, filesystem events can
+          // indicate new subdirectories under the root (e.g. mkdir first, SKILL.md
+          // written later). Refresh watchers to ensure we start watching newly
+          // created directories so subsequent writes trigger another reload.
+          if (this.isHotReloadEnabled() && (reason === "startup" || reason.startsWith("watch"))) {
+            this.refreshWatchers();
+          }
           continue;
         }
 
@@ -234,8 +251,15 @@ export class SkillsRuntime {
 
     const skillDirs = this.snapshot.skills.map((skill) => path.dirname(skill.skillPath));
 
+    const rootChildDirs: string[] = [];
+    for (const root of roots) {
+      if (!isDirectory(root)) continue;
+      rootChildDirs.push(...listImmediateSubdirs(root));
+    }
+
     const targets = dedupe([
       ...roots.map((root) => (isDirectory(root) ? root : path.dirname(root))),
+      ...rootChildDirs,
       ...skillDirs.filter((dir) => isDirectory(dir)),
     ]);
 
