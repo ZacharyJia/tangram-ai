@@ -24,6 +24,37 @@ function clipForLog(text: string, maxChars = 4000): string {
   return `${text.slice(0, maxChars)}... [truncated ${text.length - maxChars} chars]`;
 }
 
+function clipForPrompt(text: string, maxChars = 12000): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n...[truncated ${text.length - maxChars} chars]`;
+}
+
+function normalizeMemoryText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\r?\n/g, "\n")
+    .replace(/\s+/g, " ")
+    .replace(/^[\-*•]\s+/gm, "")
+    .trim();
+}
+
+function isDuplicateMemoryEntry(candidate: string, existing: string): boolean {
+  const normalizedCandidate = normalizeMemoryText(candidate);
+  if (!normalizedCandidate) return false;
+
+  const normalizedExisting = normalizeMemoryText(existing);
+  if (!normalizedExisting) return false;
+  if (normalizedExisting.includes(normalizedCandidate)) return true;
+
+  const normalizedLines = candidate
+    .split(/\r?\n/)
+    .map((line) => normalizeMemoryText(line))
+    .filter(Boolean);
+  if (!normalizedLines.length) return false;
+
+  return normalizedLines.every((line) => normalizedExisting.includes(line));
+}
+
 async function emitProgress(
   onProgress:
     | ((event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void)
@@ -400,11 +431,28 @@ export function createAgentGraph(
       const assistantText = last && last._getType() === "ai" ? String((last as any).content ?? "") : "";
       if (!userText && !assistantText) return {};
 
+      const [existingTodayRaw, existingLongTermRaw] = await Promise.all([
+        memory.readToday(),
+        memory.readLongTerm(),
+      ]);
+
+      const existingMemorySnapshot = [
+        "Existing memory snapshot (use this to avoid duplicates):",
+        "",
+        "[Long-term Memory]",
+        clipForPrompt(existingLongTermRaw || "(empty)", 10000),
+        "",
+        "[Today's Notes]",
+        clipForPrompt(existingTodayRaw || "(empty)", 8000),
+      ].join("\n");
+
       const reflectionPrompt = [
         "You are Tangram's memory writer.",
         "<system-reminder>",
         "- Summarize useful info from this turn into shared memory.",
         "- Store stable facts, preferences, ongoing projects, decisions, TODOs.",
+        "- Compare against existing memory snapshot and avoid duplicate/near-duplicate entries.",
+        "- If a fact is already recorded, return empty for that field.",
         "- Do NOT store secrets (API keys, tokens, passwords) or highly sensitive personal data.",
         "- If nothing should be remembered, output empty strings.",
         "- Output STRICT JSON ONLY with keys: daily, long_term.",
@@ -412,6 +460,8 @@ export function createAgentGraph(
       ].join("\n");
 
       const inputText = [
+        existingMemorySnapshot,
+        "",
         "Turn:",
         `User: ${userText}`,
         `Assistant: ${assistantText}`,
@@ -445,12 +495,18 @@ export function createAgentGraph(
       const daily = typeof obj?.daily === "string" ? obj.daily.trim() : "";
       const longTerm = typeof obj?.long_term === "string" ? obj.long_term.trim() : "";
 
+      const dailyToWrite = daily && !isDuplicateMemoryEntry(daily, existingTodayRaw) ? daily : "";
+      const longTermToWrite =
+        longTerm && !isDuplicateMemoryEntry(longTerm, existingLongTermRaw) ? longTerm : "";
+
       try {
-        if (daily) await memory.appendToday(daily);
-        if (longTerm) await memory.appendLongTerm(longTerm);
+        if (dailyToWrite) await memory.appendToday(dailyToWrite);
+        if (longTermToWrite) await memory.appendLongTerm(longTermToWrite);
         logger?.debug("Memory reflection written", {
-          wroteDaily: Boolean(daily),
-          wroteLongTerm: Boolean(longTerm),
+          wroteDaily: Boolean(dailyToWrite),
+          wroteLongTerm: Boolean(longTermToWrite),
+          skippedDuplicateDaily: Boolean(daily && !dailyToWrite),
+          skippedDuplicateLongTerm: Boolean(longTerm && !longTermToWrite),
         });
       } catch {
         // Don't break chat if memory writes fail.
