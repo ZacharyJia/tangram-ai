@@ -49,6 +49,55 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
+function maybeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function compactMeta(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function describeError(err: unknown): { message: string; details: Record<string, unknown> } {
+  const error = err as any;
+  const message = maybeString(error?.message) ?? String(err);
+  const causeMessage = maybeString(error?.cause?.message);
+  const normalizedMessage =
+    message.endsWith("reason: ") && causeMessage ? `${message}${causeMessage}` : message;
+
+  const causeDetails = error?.cause
+    ? compactMeta({
+        name: maybeString(error.cause?.name),
+        message: maybeString(error.cause?.message),
+        code: maybeString(error.cause?.code),
+        type: maybeString(error.cause?.type),
+        errno: maybeString(error.cause?.errno),
+        syscall: maybeString(error.cause?.syscall),
+        stack: maybeString(error.cause?.stack),
+      })
+    : undefined;
+
+  const details = compactMeta({
+    name: maybeString(error?.name),
+    message: maybeString(error?.message),
+    code: maybeString(error?.code),
+    type: maybeString(error?.type),
+    errno: maybeString(error?.errno),
+    syscall: maybeString(error?.syscall),
+    stack: maybeString(error?.stack),
+    cause: causeDetails,
+  });
+
+  return {
+    message: normalizedMessage,
+    details,
+  };
+}
+
 export type TelegramPush = {
   sendToThread: (params: { threadId: string; text: string }) => Promise<void>;
   stop: () => void;
@@ -166,13 +215,15 @@ export async function startTelegramGateway(
         });
         return;
       } catch (err) {
-        const message = (err as Error)?.message ?? "unknown error";
+        const info = describeError(err);
+        const message = info.message;
         const finalAttempt = attempt >= TELEGRAM_COMMAND_MAX_ATTEMPTS;
         if (finalAttempt) {
           logger?.error("Telegram bot command registration failed", {
             attempt,
             maxAttempts: TELEGRAM_COMMAND_MAX_ATTEMPTS,
             message,
+            error: info.details,
           });
           return;
         }
@@ -182,6 +233,7 @@ export async function startTelegramGateway(
           maxAttempts: TELEGRAM_COMMAND_MAX_ATTEMPTS,
           backoffMs,
           message,
+          error: info.details,
         });
         await sleep(backoffMs);
         backoffMs = Math.min(backoffMs * 2, 10000);
@@ -194,11 +246,13 @@ export async function startTelegramGateway(
   });
 
   bot.catch((err, ctx) => {
+    const info = describeError(err);
     logger?.error("Telegram update handler failed", {
-      message: (err as Error)?.message,
+      message: info.message,
       updateType: ctx?.updateType,
       chatId: String(ctx?.chat?.id ?? ""),
       userId: String(ctx?.from?.id ?? ""),
+      error: info.details,
     });
   });
 
@@ -426,8 +480,10 @@ export async function startTelegramGateway(
 
         runtime.catch((err) => {
           if (launchAcknowledged) {
+            const info = describeError(err);
             logger?.error("Telegram bot runtime failed", {
-              message: (err as Error)?.message,
+              message: info.message,
+              error: info.details,
             });
             return;
           }
@@ -440,12 +496,14 @@ export async function startTelegramGateway(
       launched = true;
       break;
     } catch (err) {
-      const message = (err as Error)?.message ?? "unknown error";
+      const info = describeError(err);
+      const message = info.message;
       if (message.includes("timeout")) {
         logger?.error("Telegram bot launch timed out; aborting for clean restart", {
           attempt,
           maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
           message,
+          error: info.details,
         });
         throw err;
       }
@@ -456,6 +514,7 @@ export async function startTelegramGateway(
           attempt,
           maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
           message,
+          error: info.details,
         });
         throw err;
       }
@@ -470,6 +529,7 @@ export async function startTelegramGateway(
         maxAttempts: TELEGRAM_LAUNCH_MAX_ATTEMPTS,
         backoffMs,
         message,
+        error: info.details,
       });
       await sleep(backoffMs);
       backoffMs = Math.min(backoffMs * 2, 30000);
