@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to release (example: v1.2.3)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +17,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
     steps:
       - name: Checkout
@@ -31,12 +38,12 @@ jobs:
 
       - name: Pack artifact
         run: |
-          tar -czf tangram2-${{ github.ref_name }}.tar.gz dist package.json package-lock.json README.md
+          tar -czf tangram2-${RELEASE_TAG}.tar.gz dist package.json package-lock.json README.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
-            tangram2-${{ github.ref_name }}.tar.gz
+            tangram2-${{ env.RELEASE_TAG }}.tar.gz
           generate_release_notes: true
-
