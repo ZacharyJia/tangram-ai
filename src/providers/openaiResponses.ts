@@ -90,7 +90,7 @@ export function createOpenAIResponsesClient(provider: ProviderConfig): LlmClient
 
   if (provider.responsesApi?.enabled === false) {
     throw new Error(
-      "This MVP only supports OpenAI Responses API. Set providers.<key>.responsesApi.enabled=true (or remove it)."
+      "Provider type 'openai' uses OpenAI Responses API. Set providers.<key>.responsesApi.enabled=true (or remove it), or use provider type 'openai-chat-completions'."
     );
   }
 

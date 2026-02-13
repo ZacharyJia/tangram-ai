@@ -2,6 +2,7 @@ import type { AppConfig, ProviderConfig } from "../config/schema.js";
 import type { LlmClient } from "./types.js";
 import { createOpenAIResponsesClient } from "./openaiResponses.js";
 import { createAnthropicMessagesClient } from "./anthropicMessages.js";
+import { createOpenAIChatCompletionsClient } from "./openaiChatCompletions.js";
 
 export function getProvider(config: AppConfig, key: string): ProviderConfig {
   const provider = config.providers[key];
@@ -18,6 +19,8 @@ export function createLlmClient(provider: ProviderConfig): LlmClient {
       return createOpenAIResponsesClient(provider);
     case "anthropic":
       return createAnthropicMessagesClient(provider);
+    case "openai-chat-completions":
+      return createOpenAIChatCompletionsClient(provider);
     default:
       throw new Error(`Unsupported provider type: ${(provider as any).type}`);
   }

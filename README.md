@@ -23,6 +23,7 @@ Edit `~/.tangram/config.json` and set:
 
 Supported providers:
 - `openai` (Responses API)
+- `openai-chat-completions` (Chat Completions API)
 - `anthropic` (Messages API, supports custom `baseUrl`)
 
 3) Run
@@ -136,7 +137,7 @@ Telegram commands:
 
 Telegram UX behaviors:
 - bot sends `typing` action while processing
-- during tool-calling loops, progress is shown via a single draft-like status message updated in place (`⏳ 正在调用工具处理你的请求… xN`), controlled by `channels.telegram.progressUpdates` (default `true`)
+- during tool-calling loops, progress is shown via a single draft-like status message updated in place; new `xN` and explanation lines are appended in the same message (`⏳ 正在调用工具处理你的请求… xN` / `💬 ...`), controlled by `channels.telegram.progressUpdates` (default `true`)
 
 ## Session Persistence
 
@@ -323,6 +324,12 @@ This project supports **multiple provider instances**. Example:
       "apiKey": "sk-ant-...",
       "baseUrl": "https://api.anthropic.com",
       "defaultModel": "claude-3-5-sonnet-latest"
+    },
+    "openai_chat": {
+      "type": "openai-chat-completions",
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "defaultModel": "gpt-4.1-mini"
     },
     "local": {
       "type": "openai",
