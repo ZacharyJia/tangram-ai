@@ -136,7 +136,7 @@ Telegram commands:
 
 Telegram UX behaviors:
 - bot sends `typing` action while processing
-- during tool-calling loops, progress hints may be sent as temporary `⏳ ...` updates (controlled by `channels.telegram.progressUpdates`, default `true`)
+- during tool-calling loops, progress is shown via a single draft-like status message updated in place (`⏳ 正在调用工具处理你的请求… xN`), controlled by `channels.telegram.progressUpdates` (default `true`)
 
 ## Session Persistence
 
