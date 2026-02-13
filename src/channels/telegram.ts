@@ -64,6 +64,11 @@ function compactMeta(input: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+function truncateForTelegram(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
 function describeError(err: unknown): { message: string; details: Record<string, unknown> } {
   const error = err as any;
   const message = maybeString(error?.message) ?? String(err);
@@ -434,19 +439,53 @@ export async function startTelegramGateway(
       const progressThrottleMs = 1200;
       let lastProgressAt = 0;
       const progressEnabled = tg.progressUpdates !== false;
+      let progressRevision = 0;
+      let progressDraftMessageId: number | undefined;
+      let lastProgressDraftText = "";
+
+      const upsertProgressDraft = async (text: string): Promise<void> => {
+        const draft = truncateForTelegram(text, 1000);
+        if (!draft || draft === lastProgressDraftText) return;
+
+        try {
+          if (!progressDraftMessageId) {
+            const sent = await ctx.reply(draft, { link_preview_options: { is_disabled: true } });
+            const sentMessageId = (sent as any)?.message_id;
+            if (typeof sentMessageId === "number") {
+              progressDraftMessageId = sentMessageId;
+            }
+          } else {
+            await ctx.telegram.editMessageText(chatId, progressDraftMessageId, undefined, draft, {
+              link_preview_options: { is_disabled: true },
+            });
+          }
+          lastProgressDraftText = draft;
+        } catch (err) {
+          const message = (err as Error)?.message ?? String(err);
+          if (message.includes("message is not modified")) return;
+          logger?.warn("Telegram progress draft update failed", {
+            chatId,
+            message,
+          });
+        }
+      };
 
       const onProgress = async (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => {
         if (event.kind === "tool_progress" && !progressEnabled) return;
         const now = Date.now();
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
+        progressRevision += 1;
 
+        const base = `⏳ 正在调用工具处理你的请求… x${progressRevision}`;
         if (event.kind === "assistant_explanation") {
-          await replyText(ctx, `💬 ${event.message}`);
+          const explanation = event.message.trim();
+          const next = explanation ? `${base}\n💬 ${explanation}` : base;
+          await upsertProgressDraft(next);
           return;
         }
 
-        await replyText(ctx, `⏳ ${event.message}`);
+        await upsertProgressDraft(base);
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
