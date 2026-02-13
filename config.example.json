@@ -17,6 +17,7 @@
     "defaults": {
       "provider": "openai",
       "workspace": "~/.tangram/workspace",
+      "recursionLimit": 25,
       "skills": {
         "enabled": true,
         "roots": [

@@ -214,6 +214,7 @@ async function runGatewayLoop(): Promise<void> {
     logger,
     cronStore
   );
+  const recursionLimit = config.agents.defaults.recursionLimit ?? 25;
 
   const invoke = async ({
     threadId,
@@ -241,6 +242,7 @@ async function runGatewayLoop(): Promise<void> {
         messages: [...history, new HumanMessage(text)],
       },
       {
+        recursionLimit,
         configurable: { thread_id: threadId, on_progress: onProgress },
       }
     );

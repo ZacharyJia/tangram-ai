@@ -43,6 +43,7 @@ export const ConfigSchema = z
             provider: z.string().min(1),
             // Workspace directory for shared memory files.
             workspace: z.string().min(1).default("~/.tangram/workspace"),
+            recursionLimit: z.number().int().min(1).max(500).optional().default(25),
             skills: z
               .object({
                 enabled: z.boolean().optional().default(true),

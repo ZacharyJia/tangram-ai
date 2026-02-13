@@ -18,6 +18,7 @@ export function buildConfigJson(answers: OnboardAnswers): string {
       defaults: {
         provider: answers.providerKey,
         workspace: "~/.tangram/workspace",
+        recursionLimit: 25,
         skills: {
           enabled: true,
           roots: ["~/.tangram/skills"],
