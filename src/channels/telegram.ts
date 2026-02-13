@@ -64,9 +64,24 @@ function compactMeta(input: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function truncateForTelegram(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
+function renderProgressDraft(lines: string[], maxChars: number): string {
+  const full = lines.join("\n");
+  if (full.length <= maxChars) return full;
+
+  const prefix = "…(已省略更早进度)\n";
+  const kept: string[] = [];
+  let length = prefix.length;
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    const added = line.length + (kept.length > 0 ? 1 : 0);
+    if (length + added > maxChars) break;
+    kept.unshift(line);
+    length += added;
+  }
+
+  if (!kept.length) return prefix.trim();
+  return `${prefix}${kept.join("\n")}`;
 }
 
 function describeError(err: unknown): { message: string; details: Record<string, unknown> } {
@@ -447,7 +462,7 @@ export async function startTelegramGateway(
       // Serialize draft updates to avoid races where multiple initial replies get sent.
       let progressDraftQueue = Promise.resolve();
 
-      const buildProgressDraft = (): string => {
+      const buildProgressLines = (): string[] => {
         const lines: string[] = [];
         if (progressRevision > 0) {
           lines.push(`${progressPrefix}${progressRevision}`);
@@ -455,14 +470,14 @@ export async function startTelegramGateway(
         if (progressExplanations.length > 0) {
           lines.push(...progressExplanations);
         }
-        return lines.join("\n");
+        return lines;
       };
 
-      const upsertProgressDraft = (text: string): Promise<void> => {
+      const upsertProgressDraft = (lines: string[]): Promise<void> => {
         progressDraftQueue = progressDraftQueue
           .catch(() => undefined)
           .then(async () => {
-            const draft = truncateForTelegram(text, 1000);
+            const draft = renderProgressDraft(lines, 3500);
             if (!draft || draft === lastProgressDraftText) return;
 
             try {
@@ -496,7 +511,7 @@ export async function startTelegramGateway(
           const explanation = event.message.trim();
           if (!explanation) return;
           progressExplanations.push(`💬 ${explanation}`);
-          await upsertProgressDraft(buildProgressDraft());
+          await upsertProgressDraft(buildProgressLines());
           return;
         }
 
@@ -504,7 +519,7 @@ export async function startTelegramGateway(
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
         progressRevision += 1;
-        await upsertProgressDraft(buildProgressDraft());
+        await upsertProgressDraft(buildProgressLines());
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
