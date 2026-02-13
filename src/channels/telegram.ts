@@ -590,6 +590,9 @@ export async function startTelegramGateway(
             if (active === abortController) {
               activeInvokeByChat.delete(chatId);
             }
+            if (!abortController.signal.aborted && stopRequestedByChat.has(chatId)) {
+              stopRequestedByChat.delete(chatId);
+            }
           }
         });
         if (!reply) {
@@ -616,6 +619,10 @@ export async function startTelegramGateway(
           console.error("Failed to send stop message", inner);
         }
         return;
+      }
+
+      if (stopRequestedByChat.has(chatId)) {
+        stopRequestedByChat.delete(chatId);
       }
 
       // Avoid echoing huge payloads back to Telegram (which can recurse into the same error).
