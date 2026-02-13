@@ -27,9 +27,20 @@ const AnthropicProviderSchema = z
   })
   .strict();
 
+const OpenAIChatCompletionsProviderSchema = z
+  .object({
+    type: z.literal("openai-chat-completions"),
+    apiKey: z.string().min(1),
+    // For OpenAI-compatible servers exposing /v1/chat/completions.
+    baseUrl: z.string().min(1).optional(),
+    defaultModel: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const ProviderSchema = z.discriminatedUnion("type", [
   OpenAIProviderSchema,
   AnthropicProviderSchema,
+  OpenAIChatCompletionsProviderSchema,
 ]);
 export type ProviderConfig = z.infer<typeof ProviderSchema>;
 
