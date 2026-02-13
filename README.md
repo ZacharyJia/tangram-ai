@@ -128,6 +128,7 @@ Shared memory lives under the configured workspace directory (default: `~/.tangr
 - Daily notes: `memory/YYYY-MM-DD.md`
 
 Telegram commands:
+- `/stop` stop current running request in this chat
 - `/memory` show memory context
 - `/remember <text>` append to today's daily memory
 - `/remember_long <text>` append to long-term memory

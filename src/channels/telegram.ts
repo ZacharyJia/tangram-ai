@@ -15,6 +15,7 @@ type InvokeFn = (params: {
   threadId: string;
   text: string;
   onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
+  signal?: AbortSignal;
 }) => Promise<string>;
 
 const TELEGRAM_HANDLER_TIMEOUT_MS = 10 * 60 * 1000;
@@ -27,6 +28,7 @@ const TELEGRAM_COMMAND_INITIAL_BACKOFF_MS = 1500;
 const TELEGRAM_FORCE_IPV4 = process.env.TANGRAM_TELEGRAM_FORCE_IPV4 !== "0";
 
 const TELEGRAM_COMMANDS = [
+  { command: "stop", description: "Stop current running task" },
   { command: "new", description: "Start a new session" },
   { command: "whoami", description: "Show your Telegram identity" },
   { command: "skill", description: "List installed skills" },
@@ -82,6 +84,19 @@ function renderProgressDraft(lines: string[], maxChars: number): string {
 
   if (!kept.length) return prefix.trim();
   return `${prefix}${kept.join("\n")}`;
+}
+
+function isAbortError(err: unknown): boolean {
+  const error = err as any;
+  const name = maybeString(error?.name)?.toLowerCase() ?? "";
+  const message = maybeString(error?.message)?.toLowerCase() ?? String(err).toLowerCase();
+  return (
+    name.includes("abort") ||
+    message.includes("abort") ||
+    message.includes("aborted") ||
+    message.includes("cancelled") ||
+    message.includes("canceled")
+  );
 }
 
 function describeError(err: unknown): { message: string; details: Record<string, unknown> } {
@@ -190,6 +205,9 @@ export async function startTelegramGateway(
     },
   });
   let lastSeenChatId: string | undefined;
+  const activeInvokeByChat = new Map<string, AbortController>();
+  const stopEpochByChat = new Map<string, number>();
+  const stopRequestedByChat = new Set<string>();
   logger?.info("Telegram gateway starting", {
     allowFromCount: Array.isArray(tg.allowFrom) ? tg.allowFrom.length : 0,
     progressUpdates: tg.progressUpdates !== false,
@@ -390,6 +408,37 @@ export async function startTelegramGateway(
     await replyText(ctx, "Started a new session for this chat.");
   });
 
+  bot.command("stop", async (ctx) => {
+    const chatId = String(ctx.chat?.id ?? "");
+    const userId = ctx.from?.id != null ? String(ctx.from.id) : "";
+
+    logger?.debug("Command /stop", { chatId, userId });
+    if (Array.isArray(tg.allowFrom) && tg.allowFrom.length > 0) {
+      if (!userId || !tg.allowFrom.includes(userId)) {
+        await replyText(ctx, "Not allowed.");
+        return;
+      }
+    }
+
+    if (!chatId) {
+      await replyText(ctx, "Cannot resolve current chat id.");
+      return;
+    }
+
+    const nextStopEpoch = (stopEpochByChat.get(chatId) ?? 0) + 1;
+    stopEpochByChat.set(chatId, nextStopEpoch);
+
+    const active = activeInvokeByChat.get(chatId);
+    if (active) {
+      stopRequestedByChat.add(chatId);
+      active.abort();
+      await replyText(ctx, "⏹️ 已发送停止信号，正在终止当前任务。");
+      return;
+    }
+
+    await replyText(ctx, "⏹️ 当前没有正在执行的任务。");
+  });
+
   bot.command("whoami", async (ctx) => {
     const chatId = String(ctx.chat?.id ?? "");
     const user = ctx.from;
@@ -523,8 +572,30 @@ export async function startTelegramGateway(
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
+      const stopEpochAtReceive = stopEpochByChat.get(chatId) ?? 0;
       try {
-        const reply = await withKeyLock(chatId, async () => invoke({ threadId: chatId, text, onProgress }));
+        const reply = await withKeyLock(chatId, async () => {
+          const currentStopEpoch = stopEpochByChat.get(chatId) ?? 0;
+          if (currentStopEpoch !== stopEpochAtReceive) {
+            logger?.info("Skip stale message due to /stop", { chatId });
+            return "";
+          }
+
+          const abortController = new AbortController();
+          activeInvokeByChat.set(chatId, abortController);
+          try {
+            return await invoke({ threadId: chatId, text, onProgress, signal: abortController.signal });
+          } finally {
+            const active = activeInvokeByChat.get(chatId);
+            if (active === abortController) {
+              activeInvokeByChat.delete(chatId);
+            }
+          }
+        });
+        if (!reply) {
+          logger?.debug("Outgoing reply skipped", { chatId });
+          return;
+        }
         logger?.debug("Outgoing reply", { chatId, length: reply.length });
         await replyText(ctx, reply);
         logger?.debug("Outgoing reply delivered", { chatId, length: reply.length });
@@ -532,6 +603,21 @@ export async function startTelegramGateway(
         stopTyping();
       }
     } catch (err) {
+      if (isAbortError(err)) {
+        logger?.info("Invoke stopped", { chatId, userId, message: (err as Error)?.message });
+        if (stopRequestedByChat.has(chatId)) {
+          stopRequestedByChat.delete(chatId);
+          return;
+        }
+        try {
+          await replyText(ctx, "⏹️ 当前请求已停止。");
+        } catch (inner) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to send stop message", inner);
+        }
+        return;
+      }
+
       // Avoid echoing huge payloads back to Telegram (which can recurse into the same error).
       // Log full error locally.
       const errorId = randomUUID().slice(0, 8);

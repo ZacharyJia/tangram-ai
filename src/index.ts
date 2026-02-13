@@ -220,10 +220,12 @@ async function runGatewayLoop(): Promise<void> {
     threadId,
     text,
     onProgress,
+    signal,
   }: {
     threadId: string;
     text: string;
     onProgress?: (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => Promise<void> | void;
+    signal?: AbortSignal;
   }) => {
     let history: BaseMessage[] = [];
     if (sessionStore) {
@@ -243,6 +245,7 @@ async function runGatewayLoop(): Promise<void> {
       },
       {
         recursionLimit,
+        signal,
         configurable: { thread_id: threadId, on_progress: onProgress },
       }
     );
