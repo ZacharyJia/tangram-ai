@@ -334,6 +334,7 @@ This project supports **multiple provider instances**. Example:
   "agents": {
     "defaults": {
       "provider": "openai",
+      "recursionLimit": 25,
       "temperature": 0.7,
       "systemPrompt": "You are a helpful assistant."
     }
@@ -347,6 +348,8 @@ This project supports **multiple provider instances**. Example:
   }
 }
 ```
+
+`agents.defaults.recursionLimit` controls LangGraph recursion depth (default `25`).
 
 Config lookup order:
 - `--config <path>`
