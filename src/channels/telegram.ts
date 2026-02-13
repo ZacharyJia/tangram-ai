@@ -454,46 +454,64 @@ export async function startTelegramGateway(
       const progressThrottleMs = 1200;
       let lastProgressAt = 0;
       const progressEnabled = tg.progressUpdates !== false;
+      const progressPrefix = "⏳ 正在调用工具处理你的请求… x";
       let progressRevision = 0;
+      const progressExplanations: string[] = [];
       let progressDraftMessageId: number | undefined;
       let lastProgressDraftText = "";
-      const progressLines: string[] = [];
+      // Serialize draft updates to avoid races where multiple initial replies get sent.
+      let progressDraftQueue = Promise.resolve();
 
-      const upsertProgressDraft = async (): Promise<void> => {
-        const draft = renderProgressDraft(progressLines, 3500);
-        if (!draft || draft === lastProgressDraftText) return;
-
-        try {
-          if (!progressDraftMessageId) {
-            const sent = await ctx.reply(draft, { link_preview_options: { is_disabled: true } });
-            const sentMessageId = (sent as any)?.message_id;
-            if (typeof sentMessageId === "number") {
-              progressDraftMessageId = sentMessageId;
-            }
-          } else {
-            await ctx.telegram.editMessageText(chatId, progressDraftMessageId, undefined, draft, {
-              link_preview_options: { is_disabled: true },
-            });
-          }
-          lastProgressDraftText = draft;
-        } catch (err) {
-          const message = (err as Error)?.message ?? String(err);
-          if (message.includes("message is not modified")) return;
-          logger?.warn("Telegram progress draft update failed", {
-            chatId,
-            message,
-          });
+      const buildProgressLines = (): string[] => {
+        const lines: string[] = [];
+        if (progressRevision > 0) {
+          lines.push(`${progressPrefix}${progressRevision}`);
         }
+        if (progressExplanations.length > 0) {
+          lines.push(...progressExplanations);
+        }
+        return lines;
+      };
+
+      const upsertProgressDraft = (lines: string[]): Promise<void> => {
+        progressDraftQueue = progressDraftQueue
+          .catch(() => undefined)
+          .then(async () => {
+            const draft = renderProgressDraft(lines, 3500);
+            if (!draft || draft === lastProgressDraftText) return;
+
+            try {
+              if (!progressDraftMessageId) {
+                const sent = await ctx.reply(draft, { link_preview_options: { is_disabled: true } });
+                const sentMessageId = (sent as any)?.message_id;
+                if (typeof sentMessageId === "number") {
+                  progressDraftMessageId = sentMessageId;
+                }
+              } else {
+                await ctx.telegram.editMessageText(chatId, progressDraftMessageId, undefined, draft, {
+                  link_preview_options: { is_disabled: true },
+                });
+              }
+              lastProgressDraftText = draft;
+            } catch (err) {
+              const message = (err as Error)?.message ?? String(err);
+              if (message.includes("message is not modified")) return;
+              logger?.warn("Telegram progress draft update failed", {
+                chatId,
+                message,
+              });
+            }
+          });
+        return progressDraftQueue;
       };
 
       const onProgress = async (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => {
         if (event.kind === "tool_progress" && !progressEnabled) return;
-
         if (event.kind === "assistant_explanation") {
           const explanation = event.message.trim();
           if (!explanation) return;
-          progressLines.push(`💬 ${explanation}`);
-          await upsertProgressDraft();
+          progressExplanations.push(`💬 ${explanation}`);
+          await upsertProgressDraft(buildProgressLines());
           return;
         }
 
@@ -501,8 +519,7 @@ export async function startTelegramGateway(
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
         progressRevision += 1;
-        progressLines.push(`⏳ 正在调用工具处理你的请求… x${progressRevision}`);
-        await upsertProgressDraft();
+        await upsertProgressDraft(buildProgressLines());
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
