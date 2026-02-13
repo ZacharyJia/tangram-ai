@@ -64,9 +64,24 @@ function compactMeta(input: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function truncateForTelegram(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
+function renderProgressDraft(lines: string[], maxChars: number): string {
+  const full = lines.join("\n");
+  if (full.length <= maxChars) return full;
+
+  const prefix = "…(已省略更早进度)\n";
+  const kept: string[] = [];
+  let length = prefix.length;
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    const added = line.length + (kept.length > 0 ? 1 : 0);
+    if (length + added > maxChars) break;
+    kept.unshift(line);
+    length += added;
+  }
+
+  if (!kept.length) return prefix.trim();
+  return `${prefix}${kept.join("\n")}`;
 }
 
 function describeError(err: unknown): { message: string; details: Record<string, unknown> } {
@@ -442,9 +457,10 @@ export async function startTelegramGateway(
       let progressRevision = 0;
       let progressDraftMessageId: number | undefined;
       let lastProgressDraftText = "";
+      const progressLines: string[] = [];
 
-      const upsertProgressDraft = async (text: string): Promise<void> => {
-        const draft = truncateForTelegram(text, 1000);
+      const upsertProgressDraft = async (): Promise<void> => {
+        const draft = renderProgressDraft(progressLines, 3500);
         if (!draft || draft === lastProgressDraftText) return;
 
         try {
@@ -472,20 +488,21 @@ export async function startTelegramGateway(
 
       const onProgress = async (event: { kind: "assistant_explanation" | "tool_progress"; message: string }) => {
         if (event.kind === "tool_progress" && !progressEnabled) return;
+
+        if (event.kind === "assistant_explanation") {
+          const explanation = event.message.trim();
+          if (!explanation) return;
+          progressLines.push(`💬 ${explanation}`);
+          await upsertProgressDraft();
+          return;
+        }
+
         const now = Date.now();
         if (now - lastProgressAt < progressThrottleMs) return;
         lastProgressAt = now;
         progressRevision += 1;
-
-        const base = `⏳ 正在调用工具处理你的请求… x${progressRevision}`;
-        if (event.kind === "assistant_explanation") {
-          const explanation = event.message.trim();
-          const next = explanation ? `${base}\n💬 ${explanation}` : base;
-          await upsertProgressDraft(next);
-          return;
-        }
-
-        await upsertProgressDraft(base);
+        progressLines.push(`⏳ 正在调用工具处理你的请求… x${progressRevision}`);
+        await upsertProgressDraft();
       };
 
       // Prevent concurrent invokes within a chat to keep ordering and memory sane.
