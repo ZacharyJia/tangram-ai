@@ -2,7 +2,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
 export type OnboardAnswers = {
-  providerType: "openai" | "anthropic";
+  providerType: "openai" | "openai-chat-completions" | "anthropic";
   providerKey: string;
   apiKey: string;
   baseUrl?: string;
@@ -53,11 +53,19 @@ export async function runOnboardPrompts(): Promise<OnboardAnswers> {
     console.log("\nTangram onboard wizard\n");
 
     const providerTypeRaw = (
-      await rl.question("Provider type (openai/anthropic) [openai]: ")
+      await rl.question("Provider type (openai/openai-chat-completions/anthropic) [openai]: ")
     )
       .trim()
       .toLowerCase();
-    const providerType = providerTypeRaw === "anthropic" ? "anthropic" : "openai";
+    const providerType =
+      providerTypeRaw === "anthropic"
+        ? "anthropic"
+        : providerTypeRaw === "openai-chat-completions" ||
+            providerTypeRaw === "openai_chat_completions" ||
+            providerTypeRaw === "openai-chat" ||
+            providerTypeRaw === "chat-completions"
+          ? "openai-chat-completions"
+          : "openai";
 
     const providerKey = await askNonEmpty(rl, "Provider key", providerType);
     const apiKey = await askNonEmpty(rl, "API key");

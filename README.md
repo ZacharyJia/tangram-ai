@@ -23,6 +23,7 @@ Edit `~/.tangram/config.json` and set:
 
 Supported providers:
 - `openai` (Responses API)
+- `openai-chat-completions` (Chat Completions API)
 - `anthropic` (Messages API, supports custom `baseUrl`)
 
 3) Run
@@ -323,6 +324,12 @@ This project supports **multiple provider instances**. Example:
       "apiKey": "sk-ant-...",
       "baseUrl": "https://api.anthropic.com",
       "defaultModel": "claude-3-5-sonnet-latest"
+    },
+    "openai_chat": {
+      "type": "openai-chat-completions",
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.openai.com/v1",
+      "defaultModel": "gpt-4.1-mini"
     },
     "local": {
       "type": "openai",
