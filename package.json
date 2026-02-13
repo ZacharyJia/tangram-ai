@@ -1,6 +1,6 @@
 {
   "name": "tangram-ai",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "description": "",
   "main": "dist/index.js",
   "bin": {
@@ -24,6 +24,14 @@
   "keywords": [],
   "author": "",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZacharyJia/tangram-ai"
+  },
+  "bugs": {
+    "url": "https://github.com/ZacharyJia/tangram-ai/issues"
+  },
+  "homepage": "https://github.com/ZacharyJia/tangram-ai",
   "type": "module",
   "dependencies": {
     "@langchain/langgraph": "^1.1.4",
