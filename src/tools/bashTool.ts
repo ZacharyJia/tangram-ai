@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
@@ -13,6 +13,7 @@ const BashArgs = z
     command: z.array(z.string().min(1)).min(1),
     cwd: z.string().min(1).optional(),
     timeoutMs: z.number().int().min(500).max(300000).optional(),
+    background: z.boolean().optional().default(false),
   })
   .strict();
 
@@ -20,7 +21,7 @@ export const bashToolDefs: FunctionToolDef[] = [
   {
     name: "bash",
     description:
-      "Run a command with argv form. Prefer ['bash','-lc','...'] for shell syntax. Execution restrictions depend on shell config (roots or fullAccess mode).",
+      "Run a command with argv form. Prefer ['bash','-lc','...'] for shell syntax. Set background=true to start asynchronously and return PID immediately. Execution restrictions depend on shell config (roots or fullAccess mode).",
     strict: true,
     parameters: {
       type: "object",
@@ -34,6 +35,11 @@ export const bashToolDefs: FunctionToolDef[] = [
         },
         cwd: { type: "string", description: "Optional working directory under allowed roots." },
         timeoutMs: { type: "integer", minimum: 500, maximum: 300000 },
+        background: {
+          type: "boolean",
+          description:
+            "Optional. If true, start process asynchronously and return pid immediately (no stdout/stderr capture).",
+        },
       },
       required: ["command", "cwd", "timeoutMs"],
     },
@@ -118,7 +124,7 @@ export async function executeBashTool(
     return `Invalid arguments for bash: ${parsed.error.toString()}`;
   }
 
-  const { command, cwd, timeoutMs } = parsed.data;
+  const { command, cwd, timeoutMs, background } = parsed.data;
   const roots = resolveRoots(opts.roots);
 
   if (!opts.fullAccess && !roots.length) {
@@ -139,6 +145,51 @@ export async function executeBashTool(
   const [file, ...args] = command;
   if (!file) {
     return "Invalid arguments for bash: command is empty.";
+  }
+
+  if (background) {
+    try {
+      const child: ChildProcess = spawn(file, args, {
+        cwd: runCwd,
+        detached: true,
+        stdio: "ignore",
+        env: process.env,
+      });
+      const pid = child.pid;
+      child.unref();
+
+      if (!pid || pid <= 0) {
+        return [
+          "status: failed",
+          `cwd: ${runCwd}`,
+          `command: ${JSON.stringify(command)}`,
+          "stderr:",
+          "Failed to start background process: pid is unavailable.",
+        ].join("\n");
+      }
+
+      return [
+        "status: started",
+        "background: true",
+        `pid: ${pid}`,
+        `cwd: ${runCwd}`,
+        `command: ${JSON.stringify(command)}`,
+        "stdout:",
+        "",
+        "stderr:",
+        "",
+        "note: timeoutMs is ignored in background mode",
+        "note: stdout/stderr are not captured in background mode",
+      ].join("\n");
+    } catch (err: any) {
+      return [
+        "status: failed",
+        `cwd: ${runCwd}`,
+        `command: ${JSON.stringify(command)}`,
+        "stderr:",
+        String(err?.message ?? err),
+      ].join("\n");
+    }
   }
 
   try {

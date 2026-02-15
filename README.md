@@ -258,6 +258,19 @@ Enable shell execution only when needed:
 
 When enabled, the model can call a `bash` tool with argv form commands (e.g. `['bash','-lc','ls -la']`), constrained to allowed roots.
 
+`bash` tool supports optional `background: true` to run asynchronously and return PID immediately. In background mode, stdout/stderr are not captured by the tool.
+
+Example tool args:
+
+```json
+{
+  "command": ["bash", "-lc", "sleep 30"],
+  "cwd": "~/.tangram/workspace",
+  "timeoutMs": 120000,
+  "background": true
+}
+```
+
 Set `shell.fullAccess=true` to disable cwd root restrictions and allow any local path.
 
 ## Heartbeat (Optional)
