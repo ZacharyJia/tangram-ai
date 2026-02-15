@@ -3,10 +3,12 @@ import os from "node:os";
 import path from "node:path";
 
 import { ConfigSchema, type AppConfig } from "./schema.js";
+import { loadSoulFromConfig, type LoadedSoulDocument } from "./soul.js";
 
 export type LoadedConfig = {
   config: AppConfig;
   configPath: string;
+  soul?: LoadedSoulDocument;
 };
 
 async function fileExists(p: string): Promise<boolean> {
@@ -71,5 +73,7 @@ export async function loadConfig(explicitPath?: string): Promise<LoadedConfig> {
     );
   }
 
-  return { config, configPath };
+  const soul = await loadSoulFromConfig(config, configPath);
+
+  return { config, configPath, soul };
 }

@@ -4,6 +4,7 @@ import {
   buildConfigJson,
   buildCronStoreTemplate,
   buildHeartbeatTemplate,
+  buildSoulTemplate,
   buildSkillsReadmeTemplate,
 } from "./templates.js";
 import { installService } from "../deploy/systemdUser.js";
@@ -16,6 +17,7 @@ export async function runOnboard(): Promise<void> {
 
   const files = [
     { filePath: paths.configPath, content: buildConfigJson(answers) },
+    { filePath: paths.soulPath, content: buildSoulTemplate() + "\n" },
     { filePath: paths.heartbeatPath, content: buildHeartbeatTemplate() },
     { filePath: paths.cronStorePath, content: buildCronStoreTemplate() + "\n" },
     { filePath: paths.skillsReadmePath, content: buildSkillsReadmeTemplate() + "\n" },

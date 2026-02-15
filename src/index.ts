@@ -148,9 +148,18 @@ async function runGatewayLoop(): Promise<void> {
   const configPath = getArg("--config");
   const verbose = hasFlag("--verbose", "-v");
   const logger = createLogger(verbose);
-  const { config, configPath: loadedFrom } = await loadConfig(configPath);
+  const { config, configPath: loadedFrom, soul } = await loadConfig(configPath);
   // eslint-disable-next-line no-console
   console.log(`Loaded config: ${loadedFrom}`);
+  if (soul) {
+    // eslint-disable-next-line no-console
+    console.log(`Loaded SOUL.md: ${soul.path}`);
+    logger.info("SOUL profile loaded", {
+      path: soul.path,
+      mergeMode: soul.mergeMode,
+      sectionCount: soul.parsed.sections.length,
+    });
+  }
 
   if (config.agents.defaults.shell?.enabled && config.agents.defaults.shell?.fullAccess) {
     // Always print this warning, even when --verbose is disabled.
@@ -212,7 +221,8 @@ async function runGatewayLoop(): Promise<void> {
     memory,
     () => skillsRuntime.getSnapshot().metadata,
     logger,
-    cronStore
+    cronStore,
+    soul
   );
   const recursionLimit = config.agents.defaults.recursionLimit ?? 25;
 

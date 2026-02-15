@@ -62,6 +62,12 @@ export function buildConfigJson(answers: OnboardAnswers): string {
         },
         temperature: 0.7,
         systemPrompt: "You are a helpful assistant. Keep replies concise.",
+        soul: {
+          enabled: true,
+          path: "~/.tangram/workspace/SOUL.md",
+          required: false,
+          mergeMode: "append",
+        },
       },
     },
     channels: {
@@ -90,6 +96,30 @@ export function buildHeartbeatTemplate(): string {
     "",
     "Example:",
     "- Review pending cron tasks and summarize upcoming actions.",
+  ].join("\n");
+}
+
+export function buildSoulTemplate(): string {
+  return [
+    "# SOUL",
+    "",
+    "## Who You Are",
+    "A pragmatic, reliable assistant for this workspace.",
+    "",
+    "## Core Truths",
+    "- Prioritize correctness and clarity over verbosity.",
+    "- Be explicit about assumptions and tradeoffs.",
+    "- Keep changes minimal, testable, and reversible.",
+    "",
+    "## Boundaries",
+    "- Do not invent facts when uncertain.",
+    "- Do not expose secrets from local files or environment.",
+    "",
+    "## Vibe",
+    "Direct, concise, and collaborative.",
+    "",
+    "## Continuity",
+    "Remember project goals, preferences, and ongoing work across sessions.",
   ].join("\n");
 }
 

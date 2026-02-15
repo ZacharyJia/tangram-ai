@@ -16,6 +16,7 @@ export type OnboardPaths = {
   workspaceDir: string;
   skillsDir: string;
   configPath: string;
+  soulPath: string;
   heartbeatPath: string;
   cronStorePath: string;
   skillsReadmePath: string;
@@ -33,6 +34,7 @@ export function getDefaultOnboardPaths(): OnboardPaths {
     workspaceDir,
     skillsDir,
     configPath: path.join(baseDir, "config.json"),
+    soulPath: path.join(workspaceDir, "SOUL.md"),
     heartbeatPath: path.join(workspaceDir, "HEARTBEAT.md"),
     cronStorePath: path.join(workspaceDir, "cron-tasks.json"),
     skillsReadmePath: path.join(skillsDir, "README.md"),
