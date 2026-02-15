@@ -54,9 +54,47 @@ function mapMessages(messages: BaseMessage[], systemPrompt?: string): OpenAI.Cha
 
 function appendToolCycle(
   messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  toolHistoryItems?: Array<
+    | { type: "function_call"; call_id: string; name: string; arguments: string }
+    | { type: "function_call_output"; call_id: string; output: string }
+  >,
   toolCallItems?: Array<{ type: "function_call"; call_id: string; name: string; arguments: string }>,
   toolOutputs?: Array<{ type: "function_call_output"; call_id: string; output: string }>
 ): void {
+  if (toolHistoryItems?.length) {
+    for (let i = 0; i < toolHistoryItems.length; i += 1) {
+      const item = toolHistoryItems[i];
+      if (item.type === "function_call") {
+        const calls: Array<{ type: "function_call"; call_id: string; name: string; arguments: string }> = [item];
+        while (i + 1 < toolHistoryItems.length && toolHistoryItems[i + 1]?.type === "function_call") {
+          i += 1;
+          calls.push(toolHistoryItems[i] as any);
+        }
+
+        messages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: calls.map((call) => ({
+            id: call.call_id,
+            type: "function",
+            function: {
+              name: call.name,
+              arguments: call.arguments,
+            },
+          })),
+        } as OpenAI.Chat.ChatCompletionMessageParam);
+        continue;
+      }
+
+      messages.push({
+        role: "tool",
+        tool_call_id: item.call_id,
+        content: item.output,
+      } as OpenAI.Chat.ChatCompletionMessageParam);
+    }
+    return;
+  }
+
   if (toolCallItems?.length) {
     messages.push({
       role: "assistant",
@@ -132,10 +170,11 @@ export function createOpenAIChatCompletionsClient(provider: ProviderConfig): Llm
   });
 
   const createCompletion = async (params: GenerateWithToolsParams): Promise<GenerateWithToolsResult> => {
-    const { messages, model, temperature, systemPrompt, tools, toolCallItems, toolOutputs } = params;
+    const { messages, model, temperature, systemPrompt, tools, toolHistoryItems, toolCallItems, toolOutputs } =
+      params;
 
     const chatMessages = mapMessages(messages, systemPrompt);
-    appendToolCycle(chatMessages, toolCallItems, toolOutputs);
+    appendToolCycle(chatMessages, toolHistoryItems, toolCallItems, toolOutputs);
     const functionTools = convertFunctionTools(tools);
 
     const resp = await client.chat.completions.create({

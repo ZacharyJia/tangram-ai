@@ -100,17 +100,20 @@ export function createOpenAIResponsesClient(provider: ProviderConfig): LlmClient
   });
 
   const createResponse = async (params: GenerateWithToolsParams): Promise<GenerateWithToolsResult> => {
-    const { messages, model, temperature, systemPrompt, tools, toolCallItems, toolOutputs } = params;
+    const { messages, model, temperature, systemPrompt, tools, toolHistoryItems, toolCallItems, toolOutputs } =
+      params;
     const messageItems: OpenAI.Responses.EasyInputMessage[] = messages.map((m) => ({
       type: "message" as const,
       role: toOpenAIRole(m),
       content: coerceContentToString((m as any).content),
     }));
 
+    const toolInputItems =
+      toolHistoryItems && toolHistoryItems.length > 0 ? toolHistoryItems : [...(toolCallItems ?? []), ...(toolOutputs ?? [])];
+
     const input: OpenAI.Responses.ResponseInputItem[] = [
       ...messageItems,
-      ...((toolCallItems ?? []) as any),
-      ...((toolOutputs ?? []) as any),
+      ...(toolInputItems as any),
     ];
 
     const functionTools: OpenAI.Responses.FunctionTool[] | undefined = tools?.map((t: FunctionToolDef) => ({
