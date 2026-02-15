@@ -161,6 +161,24 @@ export const ConfigSchema = z
             model: z.string().min(1).optional(),
             temperature: z.number().min(0).max(2).optional(),
             systemPrompt: z.string().optional(),
+            soul: z
+              .object({
+                enabled: z.boolean().optional().default(true),
+                // Defaults to workspace SOUL.md when path is omitted.
+                path: z.string().min(1).optional().default("~/.tangram/workspace/SOUL.md"),
+                // If true, fail startup when SOUL.md is missing or invalid.
+                required: z.boolean().optional().default(false),
+                // append: systemPrompt + SOUL.md, replace: SOUL.md only.
+                mergeMode: z.enum(["append", "replace"]).optional().default("append"),
+              })
+              .strict()
+              .optional()
+              .default({
+                enabled: true,
+                path: "~/.tangram/workspace/SOUL.md",
+                required: false,
+                mergeMode: "append",
+              }),
           })
           .strict(),
       })

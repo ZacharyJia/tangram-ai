@@ -2,6 +2,7 @@ import { Annotation, END, MessagesAnnotation, START, StateGraph } from "@langcha
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 import type { AppConfig } from "../config/schema.js";
+import type { LoadedSoulDocument } from "../config/soul.js";
 import type { LlmClient } from "../providers/types.js";
 import { getProvider } from "../providers/registry.js";
 import type { MemoryStore } from "../memory/store.js";
@@ -177,7 +178,8 @@ export function createAgentGraph(
   memory?: MemoryStore,
   getSkillsMetadata?: () => string,
   logger?: Logger,
-  cronStore?: CronStore
+  cronStore?: CronStore,
+  soul?: LoadedSoulDocument
 ) {
   const agentDefaults = config.agents.defaults;
   const provider = getProvider(config, agentDefaults.provider);
@@ -211,8 +213,14 @@ export function createAgentGraph(
       const currentTimeContext = buildCurrentTimeContext();
       const memoryContext = memory ? await memory.getMemoryContext() : "";
       const skillsMetadata = getSkillsMetadata ? getSkillsMetadata() : "";
+      const mergedSystemPrompt =
+        soul?.mergeMode === "replace" && soul.promptBlock.trim()
+          ? soul.promptBlock
+          : [agentDefaults.systemPrompt, soul?.promptBlock]
+              .filter((block): block is string => Boolean(block && block.trim()))
+              .join("\n\n");
       const instructions = buildInstructions(
-        agentDefaults.systemPrompt,
+        mergedSystemPrompt || undefined,
         currentTimeContext,
         memoryContext,
         skillsMetadata,

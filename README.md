@@ -117,9 +117,45 @@ Run `npm run onboard` for an interactive setup that:
 - asks for provider/API/Telegram settings
 - applies developer-default permissions (shell enabled but restricted)
 - initializes `~/.tangram` directories and baseline files
+- writes a starter `~/.tangram/workspace/SOUL.md` profile
 - initializes runtime directories under `~/.tangram/app`
 - can install/start user-level `systemd` service
 - handles existing files one by one (`overwrite` / `skip` / `backup then overwrite`)
+
+## SOUL.md Personality Profile
+
+Tangram supports `SOUL.md` as a structured markdown profile for agent identity and behavior.
+
+Expected sections (recommended):
+- `Who You Are`
+- `Core Truths`
+- `Boundaries`
+- `Vibe`
+- `Continuity`
+
+Config:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "systemPrompt": "You are a helpful assistant. Keep replies concise.",
+      "soul": {
+        "enabled": true,
+        "path": "~/.tangram/workspace/SOUL.md",
+        "required": false,
+        "mergeMode": "append"
+      }
+    }
+  }
+}
+```
+
+Behavior:
+- `mergeMode=append` (default): `systemPrompt` + parsed `SOUL.md`
+- `mergeMode=replace`: use parsed `SOUL.md` as the primary persona prompt
+- when `required=false` and file is missing, startup continues without SOUL (backward compatible)
+- relative `soul.path` values resolve from the directory containing `config.json`
 
 ## Memory (Shared)
 
@@ -357,7 +393,13 @@ This project supports **multiple provider instances**. Example:
       "provider": "openai",
       "recursionLimit": 25,
       "temperature": 0.7,
-      "systemPrompt": "You are a helpful assistant."
+      "systemPrompt": "You are a helpful assistant.",
+      "soul": {
+        "enabled": true,
+        "path": "~/.tangram/workspace/SOUL.md",
+        "required": false,
+        "mergeMode": "append"
+      }
     }
   },
   "channels": {
