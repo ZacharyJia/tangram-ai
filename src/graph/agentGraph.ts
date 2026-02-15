@@ -60,6 +60,15 @@ const GraphState = Annotation.Root({
     reducer: (_prev, next) => (Array.isArray(next) ? next : []),
     default: () => [],
   }),
+  toolHistoryItems: Annotation<
+    Array<
+      | { type: "function_call"; call_id: string; name: string; arguments: string }
+      | { type: "function_call_output"; call_id: string; output: string }
+    >
+  >({
+    reducer: (prev, next) => [...prev, ...(Array.isArray(next) ? next : [])],
+    default: () => [],
+  }),
 });
 
 export type AgentGraphState = typeof GraphState.State;
@@ -197,6 +206,7 @@ export function createAgentGraph(
       logger?.debug("Graph node: llm", {
         messageCount: state.messages.length,
         pendingToolCalls: state.pendingToolCalls.length,
+        toolHistoryCount: state.toolHistoryItems.length,
       });
       const currentTimeContext = buildCurrentTimeContext();
       const memoryContext = memory ? await memory.getMemoryContext() : "";
@@ -223,6 +233,7 @@ export function createAgentGraph(
         temperature: agentDefaults.temperature,
         systemPrompt: instructions,
         tools: tools.length > 0 ? tools : undefined,
+        toolHistoryItems: state.toolHistoryItems,
         toolCallItems: state.toolCallItems,
         toolOutputs: state.toolOutputs,
       });
@@ -277,12 +288,14 @@ export function createAgentGraph(
           pendingToolCalls: [],
           toolCallItems: [],
           toolOutputs: [],
+          toolHistoryItems: [],
         };
       }
 
       return {
         pendingToolCalls: toolCalls,
         toolCallItems,
+        toolHistoryItems: toolCallItems,
         lastReply: "",
         // Tool outputs were consumed by this LLM call.
         toolOutputs: [],
@@ -391,6 +404,7 @@ export function createAgentGraph(
       return {
         pendingToolCalls: [],
         toolOutputs: outputs,
+        toolHistoryItems: outputs,
       };
     })
     .addNode("memory_reflect", async (state) => {

@@ -71,9 +71,59 @@ function convertFunctionTools(tools?: FunctionToolDef[]): unknown[] | undefined 
 
 function appendToolCycle(
   messages: AnthropicMessage[],
+  toolHistoryItems?: Array<
+    | { type: "function_call"; call_id: string; name: string; arguments: string }
+    | { type: "function_call_output"; call_id: string; output: string }
+  >,
   toolCallItems?: Array<{ type: "function_call"; call_id: string; name: string; arguments: string }>,
   toolOutputs?: Array<{ type: "function_call_output"; call_id: string; output: string }>
 ) {
+  if (toolHistoryItems?.length) {
+    for (let i = 0; i < toolHistoryItems.length; i += 1) {
+      const item = toolHistoryItems[i];
+      if (item.type === "function_call") {
+        const content: AnthropicContentBlock[] = [];
+        const calls: Array<{ type: "function_call"; call_id: string; name: string; arguments: string }> = [item];
+        while (i + 1 < toolHistoryItems.length && toolHistoryItems[i + 1]?.type === "function_call") {
+          i += 1;
+          calls.push(toolHistoryItems[i] as any);
+        }
+        for (const c of calls) {
+          let input: unknown = {};
+          try {
+            input = JSON.parse(c.arguments);
+          } catch {
+            input = { _raw: c.arguments };
+          }
+          content.push({
+            type: "tool_use",
+            id: c.call_id,
+            name: c.name,
+            input,
+          });
+        }
+        messages.push({ role: "assistant", content });
+        continue;
+      }
+
+      const content: AnthropicContentBlock[] = [];
+      const outputs: Array<{ type: "function_call_output"; call_id: string; output: string }> = [item];
+      while (i + 1 < toolHistoryItems.length && toolHistoryItems[i + 1]?.type === "function_call_output") {
+        i += 1;
+        outputs.push(toolHistoryItems[i] as any);
+      }
+      for (const o of outputs) {
+        content.push({
+          type: "tool_result",
+          tool_use_id: o.call_id,
+          content: o.output,
+        });
+      }
+      messages.push({ role: "user", content });
+    }
+    return;
+  }
+
   if (!toolCallItems?.length && !toolOutputs?.length) return;
 
   if (toolCallItems?.length) {
@@ -134,11 +184,12 @@ export function createAnthropicMessagesClient(provider: ProviderConfig): LlmClie
   const version = provider.anthropicVersion ?? "2023-06-01";
 
   const createMessage = async (params: GenerateWithToolsParams): Promise<GenerateWithToolsResult> => {
-    const { messages, model, temperature, systemPrompt, tools, toolCallItems, toolOutputs } = params;
+    const { messages, model, temperature, systemPrompt, tools, toolHistoryItems, toolCallItems, toolOutputs } =
+      params;
 
     const mapped = mapMessages(messages);
     const anthropicMessages = [...mapped.messages];
-    appendToolCycle(anthropicMessages, toolCallItems, toolOutputs);
+    appendToolCycle(anthropicMessages, toolHistoryItems, toolCallItems, toolOutputs);
 
     const system = [mapped.system, systemPrompt].filter(Boolean).join("\n\n").trim() || undefined;
 
@@ -186,4 +237,3 @@ export function createAnthropicMessagesClient(provider: ProviderConfig): LlmClie
     },
   };
 }
-

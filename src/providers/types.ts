@@ -21,6 +21,19 @@ export type FunctionToolCall = {
 };
 
 export type GenerateWithToolsParams = GenerateTextParams & {
+  toolHistoryItems?: Array<
+    | {
+        type: "function_call";
+        call_id: string;
+        name: string;
+        arguments: string;
+      }
+    | {
+        type: "function_call_output";
+        call_id: string;
+        output: string;
+      }
+  >;
   tools?: FunctionToolDef[];
   toolCallItems?: Array<{
     type: "function_call";
